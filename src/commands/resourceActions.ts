@@ -52,6 +52,8 @@ export class ResourceActions {
   openTable: (context: string, kindId: string) => void = () => undefined;
   /** Set by the extension: opens the log viewer panel. */
   openLogs: (context: string, request: LogsRequest) => void = () => undefined;
+  /** Set by the extension: issues a kubeconfig for a service account. */
+  serviceAccountKubeconfig: (context: string, namespace: string, name: string) => Promise<void> = async () => undefined;
   /** Set by the extension: remembers opened objects for the Recent list. */
   onOpened: (context: string, ref: ObjectRef) => void = () => undefined;
 
@@ -122,6 +124,9 @@ export class ResourceActions {
           return true;
         case 'helmUninstall':
           return await this.helmUninstall(context, first);
+        case 'kubeconfig':
+          await this.serviceAccountKubeconfig(context, first.namespace ?? 'default', first.name);
+          return false;
       }
     } catch (err) {
       const message = errorMessage(err);
@@ -775,6 +780,7 @@ export function actionTitle(action: ActionId): string {
       drain: 'Drain',
       nodeShell: 'Node Shell',
       debug: 'Debug',
+      kubeconfig: 'Kubeconfig',
       helmUninstall: 'Uninstall'
     } as Record<ActionId, string>
   )[action];

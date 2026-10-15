@@ -9,6 +9,7 @@ import * as yaml from 'js-yaml';
 import type { K8sObject } from './cluster';
 import { allKubeconfigFiles } from './kubeconfig';
 import { logger } from './logger';
+import { findTool } from '../setup/tools';
 
 export class HelmNotInstalledError extends Error {
   constructor() {
@@ -21,7 +22,7 @@ export function runHelm(context: string, args: string[]): Promise<string> {
   const fullArgs = [...args, '--kube-context', context];
   logger.info(`helm ${fullArgs.join(' ')}`);
   return new Promise((resolve, reject) => {
-    const child = spawn('helm', fullArgs, { env: { ...process.env, KUBECONFIG: allKubeconfigFiles().join(path.delimiter) } });
+    const child = spawn(findTool('helm') ?? 'helm', fullArgs, { env: { ...process.env, KUBECONFIG: allKubeconfigFiles().join(path.delimiter) } });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (chunk: Buffer) => {

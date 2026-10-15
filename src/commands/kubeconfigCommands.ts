@@ -39,8 +39,10 @@ const PASTE_TEMPLATE = `# Paste the kubeconfig you received here (YAML, JSON or 
 # This editor is discarded after a successful import.
 `;
 
-interface ImportSource {
+export interface ImportSource {
   text: string;
+  /** Context name to propose when the kubeconfig has a single new context. */
+  suggestedName?: string;
   /** Directory to resolve relative certificate paths against. */
   baseDir?: string;
   label: string;
@@ -419,7 +421,7 @@ async function openPasteEditor(pasteDocuments: WeakSet<vscode.TextDocument>): Pr
 
 // ─────────────────────────── import ───────────────────────────
 
-async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Promise<void> {
+export async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Promise<string[]> {
   if (!source.text.trim()) {
     throw new Error(`${capitalize(source.label)} is empty.`);
   }
@@ -444,7 +446,7 @@ async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Pr
         'Import Anyway'
       );
       if (choice !== 'Import Anyway') {
-        return;
+        return [];
       }
     }
   }
@@ -477,7 +479,7 @@ async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Pr
       { title: `Import from ${source.label}`, placeHolder: 'Choose the contexts to import', canPickMany: true }
     );
     if (!picks || picks.length === 0) {
-      return;
+      return [];
     }
     chosen = picks.map((p) => p.candidate);
   }
@@ -491,9 +493,9 @@ async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Pr
     }
     if (candidate.status === 'new') {
       if (chosen.length === 1) {
-        const name = await askContextName(candidate.name, candidate.server, taken);
+        const name = await askContextName(source.suggestedName && !taken.has(source.suggestedName) ? source.suggestedName : candidate.name, candidate.server, taken);
         if (!name) {
-          return;
+          return [];
         }
         decisions.push({ source: candidate.name, target: name });
         taken.add(name);
@@ -520,7 +522,7 @@ async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Pr
       placeHolder: `Importing ${candidate.server}`
     });
     if (!picked) {
-      return;
+      return [];
     }
     if (picked.action === 'skip') {
       continue;
@@ -531,7 +533,7 @@ async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Pr
     }
     const name = picked.action === 'rename' ? suggestion : await askContextName(suggestion, candidate.server, taken);
     if (!name) {
-      return;
+      return [];
     }
     decisions.push({ source: candidate.name, target: name });
     taken.add(name);
@@ -539,7 +541,7 @@ async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Pr
 
   if (decisions.length === 0) {
     void vscode.window.showInformationMessage('Nothing to import: the selected contexts are already in your kubeconfig.');
-    return;
+    return [];
   }
 
   // 3. Merge and write.
@@ -575,6 +577,7 @@ async function importFrom(source: ImportSource, deps: KubeconfigCommandDeps): Pr
   } else if (choice === 'Show Clusters') {
     await vscode.commands.executeCommand('openLens.clusters.focus');
   }
+  return imported;
 }
 
 async function askContextName(initial: string, server: string, taken: Set<string>): Promise<string | undefined> {

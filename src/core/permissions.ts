@@ -43,6 +43,8 @@ function checksFor(action: ActionId, kind: ResourceKind): Check[] {
       return [{ ...pods('create'), clusterScoped: true }, { ...pods('create', 'exec'), clusterScoped: true }];
     case 'helmUninstall':
       return [{ verb: 'delete', group: '', resource: 'secrets' }];
+    case 'kubeconfig':
+      return [{ verb: 'create', group: '', resource: 'serviceaccounts', subresource: 'token' }];
     default:
       return [];
   }

@@ -26,6 +26,7 @@ export type ActionId =
   | 'drain'
   | 'nodeShell'
   | 'debug'
+  | 'kubeconfig'
   | 'helmUninstall';
 
 export interface ObjectRef {

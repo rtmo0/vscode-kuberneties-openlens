@@ -604,6 +604,8 @@ export function rowActions(kindId: string, obj?: K8sObject): ActionId[] {
       return ['yaml'];
     case 'helmreleases':
       return ['helmUninstall'];
+    case 'serviceaccounts':
+      return ['kubeconfig', ...common];
     default:
       return common;
   }

@@ -226,14 +226,17 @@ describe('cluster integration', { skip }, () => {
   it('shows rollout history and rolls back', async () => {
     const kind = getKind('deployments')!;
     const image = (o: K8sObject): string => o.spec.template.spec.containers[0].image;
-    await session.patch(kind, 'web', NS, { spec: { template: { spec: { containers: [{ name: 'nginx', image: 'nginx:1.27-alpine' }] } } } }, 'strategic');
+    const original = image(await session.get(kind, 'web', NS));
+    const next = original === 'nginx:1.27-alpine' ? 'nginx:1.26-alpine' : 'nginx:1.27-alpine';
+    await session.patch(kind, 'web', NS, { spec: { template: { spec: { containers: [{ name: 'nginx', image: next }] } } } }, 'strategic');
     const history = await until('a new revision', async () => {
       const h = await rolloutHistory(session, 'deployments', await session.get(kind, 'web', NS));
-      return h.length >= 2 && h.some((r) => r.current) ? h : undefined;
+      return h.find((r) => r.current)?.images.includes(next) ? h : undefined;
     });
-    const previous = history.find((r) => !r.current)!;
-    await rollbackTo(session, kind, await session.get(kind, 'web', NS), previous.revision);
-    assert.equal(image(await session.get(kind, 'web', NS)), 'nginx:alpine');
+    const back = history.find((r) => !r.current && (r.template as any).spec.containers[0].image === original)!;
+    assert.ok(back, `no earlier revision with ${original}`);
+    await rollbackTo(session, kind, await session.get(kind, 'web', NS), back.revision);
+    assert.equal(image(await session.get(kind, 'web', NS)), original);
 
     const sts = getKind('statefulsets')!;
     await session.patch(sts, 'store', NS, { spec: { template: { metadata: { annotations: { 'openlens/test': String(Date.now()) } } } } }, 'strategic');

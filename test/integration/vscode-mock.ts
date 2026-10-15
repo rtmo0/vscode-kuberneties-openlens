@@ -23,3 +23,20 @@ export const window = {
 };
 export const FileSystemError = {};
 export const commands = { executeCommand: async () => undefined };
+export const Uri = {
+  file: (fsPath: string) => ({ fsPath, toString: () => `file://${fsPath}` }),
+  parse: (value: string) => ({ toString: () => value }),
+  from: (parts: { scheme: string; path: string }) => ({ ...parts, toString: () => `${parts.scheme}:${parts.path}` })
+};
+export class Disposable {
+  constructor(private readonly onDispose: () => void) {}
+  dispose(): void {
+    this.onDispose();
+  }
+}
+export const FileType = { File: 1 };
+export const FileChangeType = { Changed: 1 };
+export const ConfigurationTarget = { Global: 1 };
+export const ProgressLocation = { Notification: 15, Window: 10 };
+export const extensions = { getExtension: () => undefined };
+export const env = { openExternal: async () => true, clipboard: { writeText: async () => undefined } };

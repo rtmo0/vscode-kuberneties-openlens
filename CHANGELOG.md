@@ -2,6 +2,22 @@
 
 All notable changes to this extension are documented in this file.
 
+## 0.2.0 - 2026-10-16
+
+### Added
+
+- Add Cluster wizard and a "Get started with Kubernetes" walkthrough.
+- Local clusters with kind, k3d and minikube (create and delete), with tool installation through Homebrew.
+- Managed clusters from Yandex Cloud, Amazon EKS, Google GKE and Azure AKS through their CLIs.
+- k3s installation on your own servers over SSH, with worker nodes.
+- Add-on catalog: metrics-server, ingress-nginx, cert-manager with Let's Encrypt issuers, Prometheus + Grafana, Loki + Promtail, Sealed Secrets, Argo CD, ExternalDNS, Local Path Provisioner.
+- Helm chart installation from Artifact Hub with schema-aware values editing; Helm repository management.
+- Cluster Doctor with fixes.
+- Team onboarding with quotas, defaults, isolation and a service-account kubeconfig; kubeconfigs for existing service accounts.
+- Image pull, TLS, .env and file-based Secrets and ConfigMaps.
+- Deploy an Image form and docker-compose conversion.
+- Manifest completion and validation against the cluster's schema (with the Red Hat YAML extension).
+
 ## 0.1.0 - 2026-10-15
 
 ### Added

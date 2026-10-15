@@ -167,6 +167,7 @@ const ICONS: Record<string, string> = {
   drain: 'M8 1l5 5h-3.2v4H6.2V6H3zM2 12h12v2.5H2z',
   nodeShell: 'M1 2h14v12H1zm1.5 1.5v9h11v-9zM3.8 5.2l2.7 2.3-2.7 2.3-.8-.9 1.7-1.4L3 6.1zM7.5 9.5H12v1.2H7.5z',
   debug: 'M5.5 2.5L7 4h2l1.5-1.5 1 1L10.3 4.7A3.5 3.5 0 0111.5 7H14v1.5h-2.5V10H14v1.5h-2.6A3.6 3.6 0 018 14a3.6 3.6 0 01-3.4-2.5H2V10h2.5V8.5H2V7h2.5c.2-.9.6-1.7 1.2-2.3L4.5 3.5zM6 6.5v4.3c0 1 .9 1.8 2 1.8s2-.8 2-1.8V6.5c0-1-.9-1.5-2-1.5s-2 .5-2 1.5z',
+  kubeconfig: 'M5 2a3 3 0 012.8 4H15v2.5h-1.5V11H12V8.5H7.8A3 3 0 115 2zm0 1.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z',
   star: 'M8 1l2.1 4.4 4.9.6-3.6 3.4.9 4.8L8 11.9l-4.3 2.3.9-4.8L1 6l4.9-.6z',
   starOff: 'M8 1l2.1 4.4 4.9.6-3.6 3.4.9 4.8L8 11.9l-4.3 2.3.9-4.8L1 6l4.9-.6zm0 3.3L6.9 6.7l-2.6.3 1.9 1.8-.5 2.6L8 10.1l2.3 1.3-.5-2.6 1.9-1.8-2.6-.3z',
   download: 'M7.3 1h1.4v8.2l2.9-2.9 1 1L8 11.9 3.4 7.3l1-1 2.9 2.9zM2 13.5h12V15H2z',
@@ -216,6 +217,7 @@ export const ACTION_TITLES: Record<ActionId, string> = {
   drain: 'Drain',
   nodeShell: 'Node Shell',
   debug: 'Debug Container',
+  kubeconfig: 'Kubeconfig for This Account',
   helmUninstall: 'Uninstall'
 };
 

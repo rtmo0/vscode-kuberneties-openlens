@@ -2,7 +2,7 @@
   "name": "vscode-kuberneties-openlens",
   "displayName": "Kubernetes Explorer & OpenLens Tools",
   "description": "OpenLens-style Kubernetes IDE in VS Code: cluster overview, workloads, pods with live CPU/memory metrics, logs, shells, secrets, port forwarding, Helm releases, YAML editing and safe kubeconfig import.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "samarin-aa-aka-rtm00",
   "license": "SEE LICENSE IN LICENSE",
   "pricing": "Free",
@@ -43,7 +43,17 @@
     "metrics",
     "copilot",
     "prometheus",
-    "rbac"
+    "rbac",
+    "kind",
+    "k3s",
+    "k3d",
+    "minikube",
+    "eks",
+    "gke",
+    "aks",
+    "yandex-cloud",
+    "ingress",
+    "cert-manager"
   ],
   "main": "./dist/extension.js",
   "extensionKind": [
@@ -98,7 +108,7 @@
     "viewsWelcome": [
       {
         "view": "openLens.clusters",
-        "contents": "No Kubernetes contexts found in your kubeconfig.\n[Import Kubeconfig](command:openLens.importKubeconfig)\nGot a kubeconfig as text? [Paste it into an editor](command:openLens.pasteKubeconfig) or [import it from the clipboard](command:openLens.importKubeconfigFromClipboard).\nContexts are merged into ~/.kube/config (or the first file of $KUBECONFIG / the openLens.kubeconfig setting)."
+        "contents": "No Kubernetes contexts found in your kubeconfig.\n[Add Cluster](command:openLens.addCluster)\nImport a kubeconfig you received, create a local cluster (kind, k3d, minikube), connect Yandex Cloud / EKS / GKE / AKS, or install k3s on your servers.\n[Get Started Guide](command:workbench.action.openWalkthrough?%5B%22samarin-aa-aka-rtm00.vscode-kuberneties-openlens%23openLens.getStarted%22%2Cfalse%5D)"
       },
       {
         "view": "openLens.portForwards",
@@ -305,12 +315,120 @@
         "title": "Sync a Kubeconfig Folder…",
         "category": "Kubernetes",
         "icon": "$(folder-library)"
+      },
+      {
+        "command": "openLens.addCluster",
+        "title": "Add Cluster…",
+        "category": "Kubernetes",
+        "icon": "$(add)"
+      },
+      {
+        "command": "openLens.createLocalCluster",
+        "title": "Create Local Cluster (kind, k3d, minikube)…",
+        "category": "Kubernetes",
+        "icon": "$(vm)"
+      },
+      {
+        "command": "openLens.deleteLocalCluster",
+        "title": "Delete Local Cluster…",
+        "category": "Kubernetes",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "openLens.installK3s",
+        "title": "Install k3s on Servers Over SSH…",
+        "category": "Kubernetes",
+        "icon": "$(server)"
+      },
+      {
+        "command": "openLens.connectCloudCluster",
+        "title": "Connect Managed Cluster (Yandex Cloud, EKS, GKE, AKS)…",
+        "category": "Kubernetes",
+        "icon": "$(cloud)"
+      },
+      {
+        "command": "openLens.openAddons",
+        "title": "Add-ons…",
+        "category": "Kubernetes",
+        "icon": "$(extensions)"
+      },
+      {
+        "command": "openLens.runDoctor",
+        "title": "Cluster Doctor",
+        "category": "Kubernetes",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "openLens.installChart",
+        "title": "Install Helm Chart…",
+        "category": "Kubernetes",
+        "icon": "$(package)"
+      },
+      {
+        "command": "openLens.helmInstallFromEditor",
+        "title": "Helm Install With These Values",
+        "category": "Kubernetes",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "openLens.manageHelmRepos",
+        "title": "Manage Helm Repositories…",
+        "category": "Kubernetes",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "openLens.onboardTeam",
+        "title": "Onboard a Team (Namespace + Access)…",
+        "category": "Kubernetes",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "openLens.newRegistrySecret",
+        "title": "New Image Pull Secret…",
+        "category": "Kubernetes",
+        "icon": "$(key)"
+      },
+      {
+        "command": "openLens.newTlsSecret",
+        "title": "New TLS Secret From Files…",
+        "category": "Kubernetes",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "openLens.newSecretFromEnv",
+        "title": "New Secret or ConfigMap From .env File…",
+        "category": "Kubernetes",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "openLens.newDataFromFiles",
+        "title": "New Secret or ConfigMap From Files…",
+        "category": "Kubernetes",
+        "icon": "$(files)"
+      },
+      {
+        "command": "openLens.deployImage",
+        "title": "Deploy an Image…",
+        "category": "Kubernetes",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "openLens.convertCompose",
+        "title": "Convert docker-compose to Kubernetes",
+        "category": "Kubernetes",
+        "icon": "$(symbol-structure)"
+      },
+      {
+        "command": "openLens.refreshYamlSchemas",
+        "title": "Refresh Manifest Schemas From Cluster",
+        "category": "Kubernetes",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "openLens.importKubeconfig",
+          "command": "openLens.addCluster",
           "when": "view == openLens.clusters",
           "group": "navigation@1"
         },
@@ -378,6 +496,36 @@
           "command": "openLens.stopAllPortForwards",
           "when": "view == openLens.portForwards",
           "group": "navigation@1"
+        },
+        {
+          "command": "openLens.importKubeconfig",
+          "when": "view == openLens.clusters",
+          "group": "1_import@0"
+        },
+        {
+          "command": "openLens.createLocalCluster",
+          "when": "view == openLens.clusters",
+          "group": "0_create@1"
+        },
+        {
+          "command": "openLens.connectCloudCluster",
+          "when": "view == openLens.clusters",
+          "group": "0_create@2"
+        },
+        {
+          "command": "openLens.installK3s",
+          "when": "view == openLens.clusters",
+          "group": "0_create@3"
+        },
+        {
+          "command": "openLens.deleteLocalCluster",
+          "when": "view == openLens.clusters",
+          "group": "0_create@4"
+        },
+        {
+          "command": "openLens.manageHelmRepos",
+          "when": "view == openLens.clusters",
+          "group": "3_misc@3"
         }
       ],
       "view/item/context": [
@@ -475,6 +623,51 @@
           "command": "openLens.unpinFavorite",
           "when": "view == openLens.favorites && viewItem =~ /^favorite\\./",
           "group": "inline@1"
+        },
+        {
+          "command": "openLens.runDoctor",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "4_setup@1"
+        },
+        {
+          "command": "openLens.openAddons",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "4_setup@2"
+        },
+        {
+          "command": "openLens.installChart",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "4_setup@3"
+        },
+        {
+          "command": "openLens.deployImage",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "4_setup@4"
+        },
+        {
+          "command": "openLens.onboardTeam",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "4_setup@5"
+        },
+        {
+          "command": "openLens.newRegistrySecret",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "5_secrets@1"
+        },
+        {
+          "command": "openLens.newTlsSecret",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "5_secrets@2"
+        },
+        {
+          "command": "openLens.newSecretFromEnv",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "5_secrets@3"
+        },
+        {
+          "command": "openLens.newDataFromFiles",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "5_secrets@4"
         }
       ],
       "editor/title": [
@@ -495,8 +688,13 @@
         },
         {
           "command": "openLens.applyYaml",
-          "when": "resourceLangId == yaml && !openLens.editorHasKubeconfig && !openLens.helmValuesEditor && resourceScheme != k8s && resourceScheme != openlens-view",
+          "when": "resourceLangId == yaml && !openLens.editorHasKubeconfig && !openLens.helmValuesEditor && !openLens.helmInstallEditor && resourceScheme != k8s && resourceScheme != openlens-view",
           "group": "navigation@2"
+        },
+        {
+          "command": "openLens.helmInstallFromEditor",
+          "when": "openLens.helmInstallEditor",
+          "group": "navigation@1"
         }
       ],
       "explorer/context": [
@@ -504,6 +702,11 @@
           "command": "openLens.importKubeconfig",
           "when": "!explorerResourceIsFolder",
           "group": "7_modification@9"
+        },
+        {
+          "command": "openLens.convertCompose",
+          "when": "resourceFilename =~ /^(docker-)?compose.*\\.ya?ml$/",
+          "group": "7_modification@10"
         }
       ],
       "commandPalette": [
@@ -546,6 +749,10 @@
         {
           "command": "openLens.helmUpgradeFromEditor",
           "when": "openLens.helmValuesEditor"
+        },
+        {
+          "command": "openLens.helmInstallFromEditor",
+          "when": "openLens.helmInstallEditor"
         }
       ]
     },
@@ -663,6 +870,24 @@
           },
           "default": {},
           "markdownDescription": "Prometheus per context as `\"context\": \"namespace/service:port\"`, or `\"off\"`. Without an entry a well-known Prometheus service is detected automatically."
+        },
+        "openLens.tools": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "markdownDescription": "Paths of command-line tools when they are not on PATH, e.g. `{\"kind\": \"/opt/tools/kind\", \"yc\": \"~/yandex-cloud/bin/yc\"}`. Known: kind, k3d, minikube, helm, yc, aws, gcloud, az, ssh, docker."
+        },
+        "openLens.yamlSchemas.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Validate and complete Kubernetes manifests with the kinds and CRDs of your cluster (needs the [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml))."
+        },
+        "openLens.yamlSchemas.context": {
+          "type": "string",
+          "default": "",
+          "description": "Context whose schemas validate manifests in the workspace; empty uses the current context."
         }
       }
     },
@@ -867,6 +1092,73 @@
           }
         }
       }
+    ],
+    "walkthroughs": [
+      {
+        "id": "openLens.getStarted",
+        "title": "Get started with Kubernetes",
+        "description": "Get a cluster, set it up, and deploy your first app without leaving VS Code.",
+        "steps": [
+          {
+            "id": "cluster",
+            "title": "Get a cluster",
+            "description": "Import a kubeconfig you received, create a local cluster with kind, k3d or minikube, connect a managed cluster (Yandex Cloud, EKS, GKE, AKS) or install k3s on your own servers.\n[Add Cluster](command:openLens.addCluster)",
+            "media": {
+              "markdown": "resources/walkthrough/cluster.md"
+            },
+            "completionEvents": [
+              "onCommand:openLens.addCluster",
+              "onCommand:openLens.importKubeconfig",
+              "onCommand:openLens.createLocalCluster"
+            ]
+          },
+          {
+            "id": "doctor",
+            "title": "Check its health",
+            "description": "Cluster Doctor checks nodes, DNS, metrics, storage, ingress, failing pods, removed APIs and certificates — with one-click fixes.\n[Run Cluster Doctor](command:openLens.runDoctor)",
+            "media": {
+              "markdown": "resources/walkthrough/doctor.md"
+            },
+            "completionEvents": [
+              "onCommand:openLens.runDoctor"
+            ]
+          },
+          {
+            "id": "addons",
+            "title": "Install the essentials",
+            "description": "metrics-server, ingress-nginx, cert-manager, Prometheus + Grafana, Loki, Argo CD and more, preconfigured for your cluster.\n[Open Add-ons](command:openLens.openAddons)",
+            "media": {
+              "markdown": "resources/walkthrough/addons.md"
+            },
+            "completionEvents": [
+              "onCommand:openLens.openAddons"
+            ]
+          },
+          {
+            "id": "deploy",
+            "title": "Deploy an app",
+            "description": "Fill a short form (image, port, domain) and get a Deployment, Service, Ingress with TLS and autoscaling — or convert a docker-compose file.\n[Deploy an Image](command:openLens.deployImage)",
+            "media": {
+              "markdown": "resources/walkthrough/deploy.md"
+            },
+            "completionEvents": [
+              "onCommand:openLens.deployImage",
+              "onCommand:openLens.convertCompose"
+            ]
+          },
+          {
+            "id": "team",
+            "title": "Give your team access",
+            "description": "Create a namespace with quotas and defaults and a ready-to-send kubeconfig with the right permissions.\n[Onboard a Team](command:openLens.onboardTeam)",
+            "media": {
+              "markdown": "resources/walkthrough/team.md"
+            },
+            "completionEvents": [
+              "onCommand:openLens.onboardTeam"
+            ]
+          }
+        ]
+      }
     ]
   },
   "scripts": {
@@ -893,6 +1185,7 @@
     "@types/tar-fs": "^2.0.4",
     "@types/vscode": "~1.95.0",
     "@vscode/vsce": "^4.0.0",
+    "ajv": "^8.20.0",
     "esbuild": "^0.28.2",
     "typescript": "^5.9.3"
   },

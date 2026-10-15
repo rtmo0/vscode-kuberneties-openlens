@@ -19,6 +19,11 @@ import { FavoritesProvider, RefNode } from './explorer/favorites';
 import { cleanForEdit, parseResourceUri, RESOURCE_SCHEME, ResourceFileSystem, toYaml } from './fs/resourceFs';
 import { VIRTUAL_SCHEME, VirtualDocuments } from './fs/virtualDocs';
 import { registerLanguageModelTools } from './lm/tools';
+import { addCluster, connectCloudCluster, createLocalCluster, deleteLocalCluster, installK3s, WizardDeps } from './setup/clusterWizards';
+import { HELM_INSTALL_CONTEXT, installChart, installFromEditor, manageRepositories, pendingInstalls } from './setup/helmInstall';
+import { convertCompose, newDataFromFiles, newRegistrySecret, newTlsSecret, onboardTeam, serviceAccountAccess, WorkloadWizardDeps } from './setup/workloadWizards';
+import { AddonsPanel, DeployPanel, DoctorPanel } from './webviews/setupPanels';
+import { ManifestSchemas } from './yaml/schemas';
 import { DashboardPanel, DetailsPanel, LogsPanel, PanelServices, ResourceTablePanel, TopologyPanel } from './webviews/panels';
 
 interface ContextArg {
@@ -88,12 +93,23 @@ export function activate(context: vscode.ExtensionContext): void {
     );
   };
 
-  registerKubeconfigCommands(context, {
+  const kubeconfigDeps = {
     clusters,
     forwards,
     virtualDocs,
-    openDashboard: (ctx) => DashboardPanel.show(services, ctx)
-  });
+    openDashboard: (ctx: string) => DashboardPanel.show(services, ctx)
+  };
+  registerKubeconfigCommands(context, kubeconfigDeps);
+  const wizardDeps: WizardDeps & WorkloadWizardDeps = {
+    ...kubeconfigDeps,
+    openAddons: (ctx) => AddonsPanel.show(services, ctx),
+    openDetails: (ctx, ref) => DetailsPanel.show(services, ctx, ref)
+  };
+  actions.serviceAccountKubeconfig = (ctx, ns, name) => serviceAccountAccess(clusters.session(ctx), ns, name, kubeconfigDeps);
+
+  const schemas = new ManifestSchemas(context, clusters);
+  context.subscriptions.push(schemas);
+  void schemas.activate().catch((err) => logger.warn('YAML schema registration failed', errorMessage(err)));
 
   command('openLens.refreshClusters', () => clusters.reload());
   command('openLens.showLogs', () => logger.show());
@@ -149,6 +165,75 @@ export function activate(context: vscode.ExtensionContext): void {
       nowProtected ? `"${name}" is protected: changes to it need the context name typed to confirm.` : `"${name}" is no longer protected.`
     );
   });
+
+  // ─────────────────────────── setup ───────────────────────────
+
+  command('openLens.addCluster', () => addCluster(wizardDeps));
+  command('openLens.createLocalCluster', () => createLocalCluster(wizardDeps));
+  command('openLens.deleteLocalCluster', () => deleteLocalCluster(wizardDeps));
+  command('openLens.installK3s', () => installK3s(wizardDeps));
+  command('openLens.connectCloudCluster', () => connectCloudCluster(wizardDeps));
+  command('openLens.openAddons', async (arg?: ContextArg) => {
+    const name = await contextOrCurrent(arg, 'Add-ons for…');
+    if (name) {
+      AddonsPanel.show(services, name);
+    }
+  });
+  command('openLens.runDoctor', async (arg?: ContextArg) => {
+    const name = await contextOrCurrent(arg, 'Check the health of…');
+    if (name) {
+      DoctorPanel.show(services, name);
+    }
+  });
+  command('openLens.installChart', async (arg?: ContextArg) => {
+    const name = await contextOrCurrent(arg, 'Install a Helm chart into…');
+    if (name) {
+      await installChart(clusters, name);
+    }
+  });
+  command('openLens.helmInstallFromEditor', async () => {
+    const doc = vscode.window.activeTextEditor?.document;
+    const pending = doc ? pendingInstalls.get(doc.uri.fsPath) : undefined;
+    const release = await installFromEditor(clusters);
+    if (release && pending?.type === 'chart') {
+      DetailsPanel.show(services, pending.context, { kindId: 'helmreleases', name: release, namespace: pending.namespace });
+    }
+  });
+  command('openLens.manageHelmRepos', () => manageRepositories());
+  command('openLens.onboardTeam', async (arg?: ContextArg) => {
+    const name = await contextOrCurrent(arg, 'Onboard a team in…');
+    if (name) {
+      await onboardTeam(clusters.session(name), wizardDeps);
+    }
+  });
+  const secretCommand = (id: string, run: (ctx: string, ns: string) => Promise<void>): void =>
+    command(id, async (arg?: ContextArg) => {
+      const name = await contextOrCurrent(arg, 'Create it in…');
+      if (name) {
+        await clusters.session(name).connect();
+        await run(name, clusters.namespaceFilter(name) || clusters.session(name).defaultNamespace || 'default');
+      }
+    });
+  secretCommand('openLens.newRegistrySecret', (ctx, ns) => newRegistrySecret(clusters.session(ctx), ns));
+  secretCommand('openLens.newTlsSecret', (ctx, ns) => newTlsSecret(clusters.session(ctx), ns, wizardDeps));
+  secretCommand('openLens.newSecretFromEnv', (ctx, ns) => newDataFromFiles(clusters.session(ctx), ns, wizardDeps, 'env'));
+  secretCommand('openLens.newDataFromFiles', (ctx, ns) => newDataFromFiles(clusters.session(ctx), ns, wizardDeps, 'files'));
+  command('openLens.deployImage', async (arg?: ContextArg) => {
+    const name = await contextOrCurrent(arg, 'Deploy into…');
+    if (name) {
+      DeployPanel.show(services, name);
+    }
+  });
+  command('openLens.convertCompose', (uri?: vscode.Uri) => convertCompose(uri, clusters.currentContext ? clusters.namespaceFilter(clusters.currentContext) : ''));
+  command('openLens.refreshYamlSchemas', () => {
+    schemas.refresh();
+    void vscode.window.showInformationMessage('Manifest schemas will be rebuilt from the cluster the next time a manifest is validated.');
+  });
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((editor) => {
+      void vscode.commands.executeCommand('setContext', HELM_INSTALL_CONTEXT, !!editor && pendingInstalls.has(editor.document.uri.fsPath));
+    })
+  );
 
   // ─────────────────────────── navigation ───────────────────────────
 

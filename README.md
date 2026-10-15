@@ -8,6 +8,27 @@ No `kubectl` is needed: the extension talks to the API server directly with the 
 
 ## Features
 
+### Get a cluster
+- **Add Cluster** (the + in the Clusters view) and the **Get started with Kubernetes** walkthrough lead you through every way in:
+  - **Local cluster** with kind, k3d or minikube: number of nodes, Kubernetes version, ports 80/443 for an ingress controller. Missing tools are installed with Homebrew; Docker is checked first. **Delete Local Cluster** removes the cluster and its context.
+  - **Managed cluster**: lists your Yandex Managed Service for Kubernetes, Amazon EKS, Google GKE or Azure AKS clusters with `yc`, `aws`, `gcloud` or `az` and fetches the credentials (public or internal endpoint for Yandex Cloud).
+  - **k3s on your servers over SSH**: installs a k3s server (and workers) with the version and ingress you choose, then imports a kubeconfig pointing at the right address.
+- Every wizard imports through the same safe merge as kubeconfig import below.
+
+### Set the cluster up
+- **Add-ons**: metrics-server, ingress-nginx, cert-manager (with Let's Encrypt ClusterIssuers), Prometheus + Grafana, Loki + Promtail, Sealed Secrets, Argo CD, ExternalDNS and Local Path Provisioner — with values preset for local clusters, status detection (also for things installed some other way), **Edit Values & Install**, upgrade and uninstall.
+- **Install Any Helm Chart**: search Artifact Hub, pick a version, edit the values with completion and validation from the chart's schema, then **Helm Install**. **Manage Helm Repositories** for the CLI.
+- **Cluster Doctor**: API server certificate, Kubernetes version support, node health and version skew, capacity, metrics-server, DNS (with a live lookup test), default StorageClass, ingress controller, failing pods, containers without requests, blocking disruption budgets, Helm releases using removed APIs — with one-click fixes.
+
+### Onboard people and apps
+- **Onboard a Team**: namespace with quota, container defaults and optional network isolation, a service account bound to view / edit / admin, and a kubeconfig with a 30-day, 1-year or non-expiring token — to copy, save, or add to your own kubeconfig. Existing service accounts get a **Kubeconfig** action.
+- **New Image Pull Secret** (Docker Hub, GHCR, GitLab, Yandex, Artifact Registry, Quay…, optionally attached to the namespace's default service account), **New TLS Secret From Files** (checks that the key matches and the certificate is valid), **Secret / ConfigMap From .env or Files**.
+- **Deploy an Image**: a form for image, port, environment, secrets, resources, health checks, service type, ingress host with a cert-manager certificate and autoscaling, with a live YAML preview — deploy, or open the YAML in an editor.
+- **Convert docker-compose to Kubernetes**: services, ports, environment, commands, named volumes (as PersistentVolumeClaims), health checks and resource limits become Deployments, Services and PVCs, with notes on what needs attention.
+
+### Manifest IntelliSense from your cluster
+- With the [YAML extension by Red Hat](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml), Kubernetes manifests are completed and validated against the OpenAPI schema of your cluster — built-in kinds and CRDs — including unknown fields (typos) and wrong apiVersions. Schemas are cached per cluster version and CRD set; **Refresh Manifest Schemas From Cluster** rebuilds them.
+
 ### Kubeconfig import that merges properly
 - **Kubernetes: Import Kubeconfig…** from a file, from the clipboard, from the active editor, or by pasting into a new editor (YAML, JSON or base64).
 - Contexts are merged into `~/.kube/config` (or the first file of `$KUBECONFIG` / the `openLens.kubeconfig` setting) without breaking what is already there:
@@ -92,12 +113,17 @@ Read-only tools for Copilot Chat and other agents: `#k8s-list-contexts`, `#k8s-l
 | `openLens.prometheus` | `{}` | Prometheus per context as `"context": "namespace/service:port"` or `"off"`; detected automatically otherwise. |
 | `openLens.portForward.address` | `127.0.0.1` | Address port forwards listen on. |
 | `openLens.portForward.openInBrowser` | `false` | Open new port forwards in the browser. |
+| `openLens.tools` | `{}` | Paths of kind, k3d, minikube, helm, yc, aws, gcloud, az, ssh or docker when they are not on PATH. |
+| `openLens.yamlSchemas.enabled` | `true` | Validate and complete manifests with the schema of your cluster. |
+| `openLens.yamlSchemas.context` | `""` | Context whose schema validates workspace manifests; empty uses the current context. |
 
 ## Requirements
 
 - VS Code 1.95 or newer.
 - Metrics need [metrics-server](https://github.com/kubernetes-sigs/metrics-server) in the cluster; history beyond the open panel needs Prometheus with cAdvisor metrics.
-- Helm upgrade, rollback and uninstall need the Helm CLI; listing and inspecting releases does not.
+- Helm upgrade, rollback and uninstall, add-ons and chart installs need the Helm CLI (offered for installation when missing); listing and inspecting releases does not.
+- Local clusters need Docker (kind, k3d) and the tool itself; managed clusters need the provider CLI signed in; k3s needs SSH key access and sudo on the servers.
+- Manifest completion needs the YAML extension by Red Hat.
 
 ## Development
 
