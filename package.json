@@ -1,0 +1,900 @@
+{
+  "name": "vscode-kuberneties-openlens",
+  "displayName": "Kubernetes Explorer & OpenLens Tools",
+  "description": "OpenLens-style Kubernetes IDE in VS Code: cluster overview, workloads, pods with live CPU/memory metrics, logs, shells, secrets, port forwarding, Helm releases, YAML editing and safe kubeconfig import.",
+  "version": "0.1.0",
+  "publisher": "samarin-aa-aka-rtm00",
+  "license": "SEE LICENSE IN LICENSE",
+  "pricing": "Free",
+  "preview": true,
+  "galleryBanner": {
+    "color": "#326CE5",
+    "theme": "dark"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rtmo0/vscode-kuberneties-openlens.git"
+  },
+  "homepage": "https://github.com/rtmo0/vscode-kuberneties-openlens#readme",
+  "bugs": {
+    "url": "https://github.com/rtmo0/vscode-kuberneties-openlens/issues"
+  },
+  "qna": "https://github.com/rtmo0/vscode-kuberneties-openlens/discussions",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "kubernetes",
+    "k8s",
+    "openlens",
+    "lens",
+    "kubectl",
+    "kubeconfig",
+    "cluster",
+    "pods",
+    "logs",
+    "port-forward",
+    "helm",
+    "secrets",
+    "metrics",
+    "copilot",
+    "prometheus",
+    "rbac"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Cluster connections and resource-changing commands require a trusted workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": true
+    }
+  },
+  "activationEvents": [
+    "onStartupFinished",
+    "onFileSystem:k8s"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "openLens",
+          "title": "Kubernetes",
+          "icon": "resources/kubernetes.svg"
+        }
+      ]
+    },
+    "views": {
+      "openLens": [
+        {
+          "id": "openLens.clusters",
+          "name": "Clusters",
+          "icon": "resources/kubernetes.svg",
+          "contextualTitle": "Kubernetes"
+        },
+        {
+          "id": "openLens.favorites",
+          "name": "Favorites",
+          "icon": "resources/kubernetes.svg",
+          "contextualTitle": "Kubernetes"
+        },
+        {
+          "id": "openLens.portForwards",
+          "name": "Port Forwards",
+          "icon": "resources/kubernetes.svg",
+          "contextualTitle": "Kubernetes"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "openLens.clusters",
+        "contents": "No Kubernetes contexts found in your kubeconfig.\n[Import Kubeconfig](command:openLens.importKubeconfig)\nGot a kubeconfig as text? [Paste it into an editor](command:openLens.pasteKubeconfig) or [import it from the clipboard](command:openLens.importKubeconfigFromClipboard).\nContexts are merged into ~/.kube/config (or the first file of $KUBECONFIG / the openLens.kubeconfig setting)."
+      },
+      {
+        "view": "openLens.portForwards",
+        "contents": "No active port forwards.\nStart one from a pod or service: the Port Forward action in a table, or the Forward button next to a container or service port."
+      },
+      {
+        "view": "openLens.favorites",
+        "contents": "Pin resources with the star in their details panel; recently opened resources show up here too.\n[Go to Resource…](command:openLens.goToResource)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "openLens.importKubeconfig",
+        "title": "Import Kubeconfig…",
+        "category": "Kubernetes",
+        "icon": "$(add)"
+      },
+      {
+        "command": "openLens.importKubeconfigFromFile",
+        "title": "Import Kubeconfig From File…",
+        "category": "Kubernetes",
+        "icon": "$(file)"
+      },
+      {
+        "command": "openLens.importKubeconfigFromClipboard",
+        "title": "Import Kubeconfig From Clipboard",
+        "category": "Kubernetes",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "openLens.importKubeconfigFromEditor",
+        "title": "Import Kubeconfig From Active Editor",
+        "category": "Kubernetes",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "openLens.pasteKubeconfig",
+        "title": "Paste Kubeconfig Into New Editor…",
+        "category": "Kubernetes",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "openLens.openKubeconfigFile",
+        "title": "Open Kubeconfig File",
+        "category": "Kubernetes",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "openLens.refreshClusters",
+        "title": "Refresh",
+        "category": "Kubernetes",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "openLens.reconnect",
+        "title": "Reconnect",
+        "category": "Kubernetes",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "openLens.openDashboard",
+        "title": "Open Cluster Overview",
+        "category": "Kubernetes",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "openLens.openTable",
+        "title": "Open Resources",
+        "category": "Kubernetes"
+      },
+      {
+        "command": "openLens.selectNamespace",
+        "title": "Filter by Namespace…",
+        "category": "Kubernetes",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "openLens.setDefaultNamespace",
+        "title": "Set Default Namespace in Kubeconfig…",
+        "category": "Kubernetes",
+        "icon": "$(symbol-namespace)"
+      },
+      {
+        "command": "openLens.setCurrentContext",
+        "title": "Switch Current Context…",
+        "category": "Kubernetes",
+        "icon": "$(check)"
+      },
+      {
+        "command": "openLens.renameContext",
+        "title": "Rename Context…",
+        "category": "Kubernetes",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "openLens.removeContext",
+        "title": "Remove Context From Kubeconfig…",
+        "category": "Kubernetes",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "openLens.applyYaml",
+        "title": "Apply YAML to Cluster…",
+        "category": "Kubernetes",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "openLens.openPortForward",
+        "title": "Open in Browser",
+        "category": "Kubernetes",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "openLens.copyPortForwardUrl",
+        "title": "Copy URL",
+        "category": "Kubernetes",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "openLens.stopPortForward",
+        "title": "Stop Port Forward",
+        "category": "Kubernetes",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "openLens.stopAllPortForwards",
+        "title": "Stop All Port Forwards",
+        "category": "Kubernetes",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "openLens.showLogs",
+        "title": "Show Output Channel",
+        "category": "Kubernetes",
+        "icon": "$(output)"
+      },
+      {
+        "command": "openLens.goToResource",
+        "title": "Go to Resource…",
+        "category": "Kubernetes",
+        "icon": "$(search)"
+      },
+      {
+        "command": "openLens.openTopology",
+        "title": "Open Topology",
+        "category": "Kubernetes",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "openLens.newResource",
+        "title": "New Resource From Template…",
+        "category": "Kubernetes",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "openLens.openResource",
+        "title": "Open Resource",
+        "category": "Kubernetes"
+      },
+      {
+        "command": "openLens.toggleProtection",
+        "title": "Toggle Protected (Production) Context",
+        "category": "Kubernetes",
+        "icon": "$(lock)"
+      },
+      {
+        "command": "openLens.unpinFavorite",
+        "title": "Remove",
+        "category": "Kubernetes",
+        "icon": "$(close)"
+      },
+      {
+        "command": "openLens.clearRecent",
+        "title": "Clear Recent",
+        "category": "Kubernetes",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "openLens.diffWithLive",
+        "title": "Diff With Live Object",
+        "category": "Kubernetes",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "openLens.helmUpgradeFromEditor",
+        "title": "Helm Upgrade With These Values",
+        "category": "Kubernetes",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "openLens.checkKubeconfigHealth",
+        "title": "Check Kubeconfig Health",
+        "category": "Kubernetes",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "openLens.exportContext",
+        "title": "Export Context as Kubeconfig…",
+        "category": "Kubernetes",
+        "icon": "$(export)"
+      },
+      {
+        "command": "openLens.addKubeconfigFolder",
+        "title": "Sync a Kubeconfig Folder…",
+        "category": "Kubernetes",
+        "icon": "$(folder-library)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "openLens.importKubeconfig",
+          "when": "view == openLens.clusters",
+          "group": "navigation@1"
+        },
+        {
+          "command": "openLens.goToResource",
+          "when": "view == openLens.clusters",
+          "group": "navigation@2"
+        },
+        {
+          "command": "openLens.refreshClusters",
+          "when": "view == openLens.clusters",
+          "group": "navigation@3"
+        },
+        {
+          "command": "openLens.pasteKubeconfig",
+          "when": "view == openLens.clusters",
+          "group": "1_import@1"
+        },
+        {
+          "command": "openLens.importKubeconfigFromClipboard",
+          "when": "view == openLens.clusters",
+          "group": "1_import@2"
+        },
+        {
+          "command": "openLens.importKubeconfigFromFile",
+          "when": "view == openLens.clusters",
+          "group": "1_import@3"
+        },
+        {
+          "command": "openLens.addKubeconfigFolder",
+          "when": "view == openLens.clusters",
+          "group": "1_import@4"
+        },
+        {
+          "command": "openLens.checkKubeconfigHealth",
+          "when": "view == openLens.clusters",
+          "group": "2_file@1"
+        },
+        {
+          "command": "openLens.openKubeconfigFile",
+          "when": "view == openLens.clusters",
+          "group": "2_file@2"
+        },
+        {
+          "command": "openLens.newResource",
+          "when": "view == openLens.clusters",
+          "group": "3_misc@1"
+        },
+        {
+          "command": "openLens.showLogs",
+          "when": "view == openLens.clusters",
+          "group": "3_misc@2"
+        },
+        {
+          "command": "openLens.goToResource",
+          "when": "view == openLens.favorites",
+          "group": "navigation@1"
+        },
+        {
+          "command": "openLens.clearRecent",
+          "when": "view == openLens.favorites",
+          "group": "navigation@2"
+        },
+        {
+          "command": "openLens.stopAllPortForwards",
+          "when": "view == openLens.portForwards",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "openLens.openDashboard",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "inline@1"
+        },
+        {
+          "command": "openLens.selectNamespace",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "inline@2"
+        },
+        {
+          "command": "openLens.openDashboard",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "1_open@1"
+        },
+        {
+          "command": "openLens.goToResource",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "1_open@2"
+        },
+        {
+          "command": "openLens.openTopology",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "1_open@3"
+        },
+        {
+          "command": "openLens.selectNamespace",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "1_open@4"
+        },
+        {
+          "command": "openLens.newResource",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "1_open@5"
+        },
+        {
+          "command": "openLens.setCurrentContext",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./ && viewItem not =~ /\\.current$/",
+          "group": "2_context@1"
+        },
+        {
+          "command": "openLens.setDefaultNamespace",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "2_context@2"
+        },
+        {
+          "command": "openLens.renameContext",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "2_context@3"
+        },
+        {
+          "command": "openLens.toggleProtection",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "2_context@4"
+        },
+        {
+          "command": "openLens.exportContext",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "2_context@5"
+        },
+        {
+          "command": "openLens.reconnect",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "3_connection@1"
+        },
+        {
+          "command": "openLens.removeContext",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\./",
+          "group": "9_danger@1"
+        },
+        {
+          "command": "openLens.openPortForward",
+          "when": "view == openLens.portForwards && viewItem == portForward",
+          "group": "inline@1"
+        },
+        {
+          "command": "openLens.stopPortForward",
+          "when": "view == openLens.portForwards && viewItem == portForward",
+          "group": "inline@2"
+        },
+        {
+          "command": "openLens.copyPortForwardUrl",
+          "when": "view == openLens.portForwards && viewItem == portForward",
+          "group": "1_actions@1"
+        },
+        {
+          "command": "openLens.stopPortForward",
+          "when": "view == openLens.portForwards && viewItem == portForward",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "openLens.unpinFavorite",
+          "when": "view == openLens.favorites && viewItem =~ /^favorite\\./",
+          "group": "inline@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "openLens.importKubeconfigFromEditor",
+          "when": "openLens.editorHasKubeconfig",
+          "group": "navigation@1"
+        },
+        {
+          "command": "openLens.helmUpgradeFromEditor",
+          "when": "openLens.helmValuesEditor",
+          "group": "navigation@1"
+        },
+        {
+          "command": "openLens.diffWithLive",
+          "when": "resourceScheme == k8s",
+          "group": "navigation@1"
+        },
+        {
+          "command": "openLens.applyYaml",
+          "when": "resourceLangId == yaml && !openLens.editorHasKubeconfig && !openLens.helmValuesEditor && resourceScheme != k8s && resourceScheme != openlens-view",
+          "group": "navigation@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "openLens.importKubeconfig",
+          "when": "!explorerResourceIsFolder",
+          "group": "7_modification@9"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "openLens.openTable",
+          "when": "false"
+        },
+        {
+          "command": "openLens.openPortForward",
+          "when": "false"
+        },
+        {
+          "command": "openLens.copyPortForwardUrl",
+          "when": "false"
+        },
+        {
+          "command": "openLens.stopPortForward",
+          "when": "false"
+        },
+        {
+          "command": "openLens.importKubeconfigFromEditor",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "openLens.applyYaml",
+          "when": "editorIsOpen"
+        },
+        {
+          "command": "openLens.openResource",
+          "when": "false"
+        },
+        {
+          "command": "openLens.unpinFavorite",
+          "when": "false"
+        },
+        {
+          "command": "openLens.diffWithLive",
+          "when": "resourceScheme == k8s"
+        },
+        {
+          "command": "openLens.helmUpgradeFromEditor",
+          "when": "openLens.helmValuesEditor"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Kubernetes OpenLens",
+      "properties": {
+        "openLens.kubeconfig": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Kubeconfig files to load, merged like `$KUBECONFIG` (the first file wins on name clashes and receives imported contexts). When empty, `$KUBECONFIG` or `~/.kube/config` is used."
+        },
+        "openLens.refreshInterval": {
+          "type": "number",
+          "default": 5,
+          "minimum": 2,
+          "description": "Seconds between refreshes of open overview, table and details panels."
+        },
+        "openLens.confirmDangerousOperations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask for confirmation before deleting, restarting or scaling to zero."
+        },
+        "openLens.backupKubeconfig": {
+          "type": "boolean",
+          "default": true,
+          "description": "Keep a timestamped backup (last 5) of a kubeconfig file before importing into it or removing contexts."
+        },
+        "openLens.logs.tailLines": {
+          "type": "number",
+          "default": 500,
+          "minimum": 0,
+          "description": "Number of past log lines to show when opening logs (0 = all)."
+        },
+        "openLens.logs.timestamps": {
+          "type": "boolean",
+          "default": false,
+          "description": "Prefix log lines with their timestamps."
+        },
+        "openLens.shell": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Command run by `sh -c` when opening a shell in a container. Empty tries `bash`, then `ash`, then `sh`."
+        },
+        "openLens.portForward.address": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "enum": [
+            "127.0.0.1",
+            "0.0.0.0",
+            "::1"
+          ],
+          "description": "Local address port forwards listen on. 0.0.0.0 exposes them to your network."
+        },
+        "openLens.portForward.openInBrowser": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open a new port forward in the browser right away."
+        },
+        "openLens.kubeconfigFolders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Folders whose files are all loaded as kubeconfigs and watched for changes, e.g. `~/.kube/configs`. Imports still go to the first kubeconfig file."
+        },
+        "openLens.protectedContexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Production contexts: names or patterns like `*prod*`. Changes to them need the context name typed to confirm, and their panels are framed in red."
+        },
+        "openLens.checkPermissions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Hide actions you have no RBAC permission for (checked with SelfSubjectAccessReview)."
+        },
+        "openLens.logs.viewer": {
+          "type": "string",
+          "enum": [
+            "panel",
+            "terminal"
+          ],
+          "default": "panel",
+          "enumDescriptions": [
+            "Log viewer with search, level filter and JSON formatting",
+            "A terminal"
+          ],
+          "description": "Where pod logs open."
+        },
+        "openLens.nodeShell.image": {
+          "type": "string",
+          "default": "busybox:1.36",
+          "description": "Image of the privileged pod used for node shells (needs nsenter)."
+        },
+        "openLens.nodeShell.namespace": {
+          "type": "string",
+          "default": "kube-system",
+          "description": "Namespace for node shell pods."
+        },
+        "openLens.debug.image": {
+          "type": "string",
+          "default": "busybox:1.36",
+          "description": "Default image for ephemeral debug containers."
+        },
+        "openLens.prometheus": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "markdownDescription": "Prometheus per context as `\"context\": \"namespace/service:port\"`, or `\"off\"`. Without an entry a well-known Prometheus service is detected automatically."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "openLens.goToResource",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "kubernetes_list_contexts",
+        "displayName": "List Kubernetes Contexts",
+        "modelDescription": "Lists the kubeconfig contexts with their API server, default namespace and credential problems. The current context is marked with *.",
+        "userDescription": "List Kubernetes Contexts",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "k8s-list-contexts",
+        "icon": "$(server-environment)",
+        "tags": [
+          "kubernetes",
+          "k8s"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
+      },
+      {
+        "name": "kubernetes_list_resources",
+        "displayName": "List Kubernetes Resources",
+        "modelDescription": "Lists resources of one kind like `kubectl get` (pods, deployments, services, nodes, events, configmaps, secrets (names only), ingresses, pvc, helm releases, custom resources…) with status columns and, for pods and nodes, CPU/memory usage.",
+        "userDescription": "List Kubernetes Resources",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "k8s-list-resources",
+        "icon": "$(server-environment)",
+        "tags": [
+          "kubernetes",
+          "k8s"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "description": "Kubeconfig context; defaults to the current context."
+            },
+            "kind": {
+              "type": "string",
+              "description": "Resource kind, e.g. pods, deployment, svc, nodes, helmreleases or a CRD kind."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Namespace; empty for all namespaces."
+            },
+            "labelSelector": {
+              "type": "string",
+              "description": "Optional label selector, e.g. app=web."
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      },
+      {
+        "name": "kubernetes_describe_resource",
+        "displayName": "Describe Kubernetes Resource",
+        "modelDescription": "Describes one resource like `kubectl describe`: status, conditions, containers (state, restarts, last termination, resources, env), related pods, rollout history and recent events. Secret values are never returned.",
+        "userDescription": "Describe Kubernetes Resource",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "k8s-describe-resource",
+        "icon": "$(server-environment)",
+        "tags": [
+          "kubernetes",
+          "k8s"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "description": "Kubeconfig context; defaults to the current context."
+            },
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ]
+        }
+      },
+      {
+        "name": "kubernetes_pod_logs",
+        "displayName": "Read Pod Logs",
+        "modelDescription": "Returns the last lines of a pod's logs, for one container or all of them; use previous=true for the instance before the last crash.",
+        "userDescription": "Read Pod Logs",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "k8s-pod-logs",
+        "icon": "$(server-environment)",
+        "tags": [
+          "kubernetes",
+          "k8s"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "description": "Kubeconfig context; defaults to the current context."
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "pod": {
+              "type": "string"
+            },
+            "container": {
+              "type": "string"
+            },
+            "tailLines": {
+              "type": "number",
+              "description": "Lines per container, default 200, max 2000."
+            },
+            "previous": {
+              "type": "boolean"
+            },
+            "sinceSeconds": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "namespace",
+            "pod"
+          ]
+        }
+      },
+      {
+        "name": "kubernetes_events",
+        "displayName": "Kubernetes Events",
+        "modelDescription": "Returns recent events, newest first; warnings only by default. Filter by namespace or by the name of the involved object.",
+        "userDescription": "Kubernetes Events",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "k8s-events",
+        "icon": "$(server-environment)",
+        "tags": [
+          "kubernetes",
+          "k8s"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "description": "Kubeconfig context; defaults to the current context."
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "warningsOnly": {
+              "type": "boolean",
+              "description": "Default true."
+            },
+            "involvedObject": {
+              "type": "string",
+              "description": "Name of the object the events are about."
+            }
+          }
+        }
+      },
+      {
+        "name": "kubernetes_cluster_overview",
+        "displayName": "Kubernetes Cluster Overview",
+        "modelDescription": "Summarises a cluster: node readiness, CPU and memory usage/requests/limits against capacity, pod and workload health, and recent warnings.",
+        "userDescription": "Kubernetes Cluster Overview",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "k8s-cluster-overview",
+        "icon": "$(server-environment)",
+        "tags": [
+          "kubernetes",
+          "k8s"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string",
+              "description": "Kubeconfig context; defaults to the current context."
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Limit pods, workloads and usage to one namespace."
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run check && npm run build",
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "compile": "tsc -p ./ --noEmit",
+    "typecheck": "tsc -p ./ --noEmit && tsc -p tsconfig.test.json",
+    "check": "npm run typecheck",
+    "package": "vsce package --no-dependencies",
+    "package:list": "vsce ls --no-dependencies",
+    "lint": "tsc -p ./ --noEmit",
+    "test": "node esbuild.test.js && node --test out/test/*.test.js",
+    "test:integration": "node esbuild.test.js && node --test --test-concurrency=1 out/test/integration/*.test.js"
+  },
+  "dependencies": {
+    "@kubernetes/client-node": "~1.4.0",
+    "js-yaml": "^4.3.2",
+    "tar-fs": "^3.1.3"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.19.43",
+    "@types/tar-fs": "^2.0.4",
+    "@types/vscode": "~1.95.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3"
+  },
+  "icon": "resources/icon.png"
+}

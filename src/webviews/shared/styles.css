@@ -1,0 +1,1184 @@
+:root {
+  --ol-ok: var(--vscode-testing-iconPassed, #3fb950);
+  --ol-warn: var(--vscode-editorWarning-foreground, #d29922);
+  --ol-error: var(--vscode-errorForeground, #f85149);
+  --ol-info: var(--vscode-charts-blue, #3794ff);
+  --ol-muted: var(--vscode-descriptionForeground, #8b949e);
+  --ol-cpu: var(--vscode-charts-blue, #3794ff);
+  --ol-memory: var(--vscode-charts-purple, #b180d7);
+  --ol-requests: var(--vscode-charts-orange, #d18616);
+  --ol-limits: var(--vscode-charts-red, #f14c4c);
+  --ol-border: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  --ol-card: var(--vscode-sideBar-background, rgba(128, 128, 128, 0.06));
+  --ol-hover: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.12));
+  --ol-radius: 4px;
+  --ol-mono: var(--vscode-editor-font-family, 'SF Mono', Menlo, Consolas, monospace);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+}
+
+a.link {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+a.link:hover {
+  text-decoration: underline;
+}
+
+code,
+pre {
+  font-family: var(--ol-mono);
+  font-size: var(--vscode-editor-font-size, 12px);
+}
+
+.icon {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  flex: none;
+}
+
+/* ───────────── toolbar ───────────── */
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--ol-border);
+  background: var(--vscode-editor-background);
+}
+
+.toolbar h1 {
+  margin: 0;
+  font-size: 1.15em;
+  font-weight: 600;
+}
+
+.toolbar .count,
+.muted {
+  color: var(--ol-muted);
+}
+
+.spacer {
+  flex: 1;
+}
+
+select,
+input[type='text'],
+input[type='search'],
+textarea {
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, var(--ol-border));
+  border-radius: 2px;
+  padding: 3px 6px;
+  font: inherit;
+}
+
+select {
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground);
+  border-color: var(--vscode-dropdown-border, var(--ol-border));
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search .icon {
+  position: absolute;
+  left: 6px;
+  color: var(--ol-muted);
+}
+
+.search input {
+  padding-left: 24px;
+  width: 240px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.btn.primary {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+}
+
+.btn.primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.btn.danger {
+  color: var(--ol-error);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--vscode-toolbar-hoverBackground, var(--ol-hover));
+}
+
+.icon-btn.danger:hover {
+  color: var(--ol-error);
+}
+
+/* ───────────── status ───────────── */
+
+.badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 0.85em;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+}
+
+.tone-ok {
+  color: var(--ol-ok);
+}
+
+.tone-warn {
+  color: var(--ol-warn);
+}
+
+.tone-error {
+  color: var(--ol-error);
+}
+
+.tone-info {
+  color: var(--ol-info);
+}
+
+.tone-muted {
+  color: var(--ol-muted);
+}
+
+.tone-text-warn {
+  color: var(--ol-warn);
+}
+
+.tone-text-error {
+  color: var(--ol-error);
+}
+
+.tone-text-ok {
+  color: var(--ol-ok);
+}
+
+.tone-text-muted {
+  color: var(--ol-muted);
+}
+
+.tone-bg-ok {
+  background: var(--ol-ok);
+}
+
+.tone-bg-warn {
+  background: var(--ol-warn);
+}
+
+.tone-bg-error {
+  background: var(--ol-error);
+}
+
+.tone-bg-info {
+  background: var(--ol-info);
+}
+
+.tone-bg-muted {
+  background: var(--ol-muted);
+}
+
+.dots {
+  display: inline-flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.ratio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mini-bar {
+  display: inline-block;
+  width: 48px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--ol-hover);
+  overflow: hidden;
+}
+
+.mini-fill {
+  display: block;
+  height: 100%;
+}
+
+.notice {
+  margin: 8px 14px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--ol-warn);
+  background: var(--vscode-inputValidation-warningBackground, rgba(210, 153, 34, 0.1));
+}
+
+.error-box {
+  margin: 12px 14px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ol-error);
+  background: var(--vscode-inputValidation-errorBackground, rgba(248, 81, 73, 0.1));
+  white-space: pre-wrap;
+}
+
+.empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--ol-muted);
+}
+
+/* ───────────── table ───────────── */
+
+table.grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.grid th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 6px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ol-muted);
+  background: var(--vscode-editor-background);
+  border-bottom: 1px solid var(--ol-border);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.page-table table.grid th {
+  top: 45px;
+}
+
+table.grid th.sortable {
+  cursor: pointer;
+}
+
+table.grid th.sortable:hover {
+  color: var(--vscode-foreground);
+}
+
+table.grid th.asc::after {
+  content: ' ▲';
+  font-size: 0.75em;
+}
+
+table.grid th.desc::after {
+  content: ' ▼';
+  font-size: 0.75em;
+}
+
+table.grid td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+  vertical-align: middle;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+table.grid td.col-name {
+  max-width: 320px;
+}
+
+table.grid td.col-owner,
+table.grid td.col-node {
+  max-width: 200px;
+}
+
+table.grid td.col-message {
+  white-space: normal;
+  min-width: 260px;
+}
+
+table.grid .right {
+  text-align: right;
+}
+
+table.grid .check {
+  width: 26px;
+  text-align: center;
+}
+
+table.grid td.actions {
+  width: 1%;
+  padding: 0 4px;
+  text-align: right;
+  white-space: nowrap;
+  opacity: 0.25;
+}
+
+table.grid tr:hover td.actions,
+table.grid tr.selected td.actions {
+  opacity: 1;
+}
+
+table.grid tr.clickable {
+  cursor: pointer;
+}
+
+table.grid tbody tr:hover {
+  background: var(--ol-hover);
+}
+
+table.grid tbody tr.selected {
+  background: var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.2));
+}
+
+.more {
+  padding: 10px 14px;
+  text-align: center;
+}
+
+.bulk {
+  display: none;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk.visible {
+  display: inline-flex;
+}
+
+/* ───────────── details ───────────── */
+
+.page {
+  padding: 0 0 32px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.header .subtitle {
+  color: var(--ol-muted);
+}
+
+.actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--ol-border);
+}
+
+.section {
+  margin: 14px 14px 0;
+}
+
+.section > h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ol-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.section > h2::before {
+  content: '▾';
+  display: inline-block;
+  width: 10px;
+}
+
+.section.collapsed > h2::before {
+  content: '▸';
+}
+
+.section.collapsed > .section-body {
+  display: none;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) 1fr;
+  gap: 4px 18px;
+}
+
+.kv .k {
+  color: var(--ol-muted);
+}
+
+.kv .v {
+  word-break: break-word;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.chip {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-family: var(--ol-mono);
+  font-size: 0.9em;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  padding: 10px 12px;
+  border: 1px solid var(--ol-border);
+  border-radius: var(--ol-radius);
+  background: var(--ol-card);
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.card-title .spacer {
+  flex: 1;
+}
+
+.card .kv {
+  font-size: 0.95em;
+}
+
+details.env summary {
+  cursor: pointer;
+  color: var(--ol-muted);
+  margin-top: 6px;
+}
+
+pre.code {
+  margin: 0;
+  padding: 10px 12px;
+  max-height: 480px;
+  overflow: auto;
+  border-radius: var(--ol-radius);
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  white-space: pre;
+}
+
+.code-wrap {
+  position: relative;
+}
+
+.code-wrap .icon-btn {
+  position: absolute;
+  top: 6px;
+  right: 14px;
+}
+
+.secret-table td.value {
+  font-family: var(--ol-mono);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-width: none;
+}
+
+.secret-table td.key {
+  font-family: var(--ol-mono);
+  font-weight: 600;
+  width: 1%;
+}
+
+.secret-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.secret-edit textarea {
+  width: 100%;
+  min-height: 90px;
+  font-family: var(--ol-mono);
+  resize: vertical;
+}
+
+.secret-edit .row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.event {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content;
+  gap: 2px 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.15));
+}
+
+.event .message {
+  grid-column: 2 / 4;
+  color: var(--vscode-foreground);
+  word-break: break-word;
+}
+
+/* ───────────── charts ───────────── */
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 10px;
+}
+
+.chart {
+  position: relative;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 140px;
+  display: block;
+}
+
+.chart-empty {
+  padding: 30px;
+  text-align: center;
+  color: var(--ol-muted);
+}
+
+.grid-line {
+  stroke: var(--ol-border);
+  stroke-width: 1;
+}
+
+.axis-label {
+  fill: var(--ol-muted);
+  font-size: 10px;
+}
+
+.area {
+  opacity: 0.18;
+  stroke: none;
+}
+
+.line {
+  fill: none;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.series-cpu.area,
+.series-cpu.point {
+  fill: var(--ol-cpu);
+}
+
+.series-cpu.line {
+  stroke: var(--ol-cpu);
+}
+
+.series-memory.area,
+.series-memory.point {
+  fill: var(--ol-memory);
+}
+
+.series-memory.line {
+  stroke: var(--ol-memory);
+}
+
+.ref-line {
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.ref-line.requests {
+  stroke: var(--ol-requests);
+}
+
+.ref-line.limits {
+  stroke: var(--ol-limits);
+}
+
+.cursor {
+  stroke: var(--ol-muted);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-tip {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--vscode-editorHoverWidget-background);
+  border: 1px solid var(--vscode-editorHoverWidget-border, var(--ol-border));
+  font-size: 0.9em;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 0.9em;
+  color: var(--ol-muted);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-item i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--ol-muted);
+}
+
+.legend-item.series-cpu i,
+.legend-item.usage i {
+  background: var(--ol-cpu);
+}
+
+.legend-item.series-memory i {
+  background: var(--ol-memory);
+}
+
+.legend-item.requests i {
+  background: var(--ol-requests);
+}
+
+.legend-item.limits i {
+  background: var(--ol-limits);
+}
+
+.rings-body {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rings {
+  width: 120px;
+  height: 120px;
+  flex: none;
+}
+
+.ring-track {
+  fill: none;
+  stroke: var(--ol-hover);
+  stroke-width: 9;
+}
+
+.ring {
+  fill: none;
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+
+.ring.flat {
+  stroke-linecap: butt;
+}
+
+.ring.usage {
+  stroke: var(--ol-cpu);
+}
+
+.ring.requests {
+  stroke: var(--ol-requests);
+}
+
+.ring.limits {
+  stroke: var(--ol-limits);
+}
+
+.ring-center {
+  fill: var(--vscode-foreground);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ring-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.92em;
+}
+
+.usage-row {
+  display: grid;
+  grid-template-columns: 80px 1fr minmax(220px, max-content);
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.usage-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--ol-hover);
+  overflow: visible;
+}
+
+.usage-fill {
+  height: 100%;
+  border-radius: 5px;
+}
+
+.usage-mark {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 16px;
+}
+
+.usage-mark.requests {
+  background: var(--ol-requests);
+}
+
+.usage-mark.limits {
+  background: var(--ol-limits);
+}
+
+/* ───────────── dashboard ───────────── */
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  margin: 14px;
+}
+
+.stat {
+  font-size: 2em;
+  font-weight: 600;
+}
+
+.stat small {
+  font-size: 0.5em;
+  color: var(--ol-muted);
+  font-weight: 400;
+}
+
+.workload {
+  cursor: pointer;
+}
+
+.workload:hover {
+  border-color: var(--vscode-focusBorder);
+}
+
+.segments {
+  display: flex;
+  height: 6px;
+  margin-top: 8px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--ol-hover);
+}
+
+.segments span {
+  height: 100%;
+}
+
+.workload-legend {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  font-size: 0.9em;
+}
+
+.loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--ol-muted);
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border: 2px solid var(--ol-muted);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: -2px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ───────────── logs ───────────── */
+
+body.page-logs {
+  overflow: hidden;
+}
+
+.logs-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.logs-app .toolbar label.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ol-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.log-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 14px;
+  border-bottom: 1px solid var(--ol-border);
+}
+
+.log-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--ol-mono);
+  font-size: 0.9em;
+  cursor: pointer;
+  opacity: 1;
+}
+
+.log-source.off {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+
+.log-view {
+  flex: 1;
+  overflow: auto;
+  padding: 4px 0 20px;
+  font-family: var(--ol-mono);
+  font-size: var(--vscode-editor-font-size, 12px);
+  line-height: 1.45;
+}
+
+.log-line {
+  padding: 0 14px;
+  white-space: pre;
+}
+
+.log-view.wrap .log-line {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-line:hover {
+  background: var(--ol-hover);
+}
+
+.log-line .src {
+  margin-right: 8px;
+  font-weight: 600;
+}
+
+.log-line .ts {
+  margin-right: 8px;
+  color: var(--ol-muted);
+}
+
+.log-line.level-error .msg {
+  color: var(--ol-error);
+}
+
+.log-line.level-warn .msg {
+  color: var(--ol-warn);
+}
+
+.log-line.level-debug .msg {
+  color: var(--ol-muted);
+}
+
+.log-line .json-key {
+  color: var(--vscode-debugTokenExpression-name, #9cdcfe);
+}
+
+mark {
+  background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+  color: inherit;
+}
+
+mark.current {
+  background: var(--vscode-editor-findMatchBackground, rgba(81, 92, 106, 0.8));
+  outline: 1px solid var(--vscode-editor-findMatchBorder, transparent);
+}
+
+.log-status {
+  padding: 3px 14px;
+  border-top: 1px solid var(--ol-border);
+  color: var(--ol-muted);
+  font-size: 0.9em;
+  display: flex;
+  gap: 12px;
+}
+
+.src-0 { color: var(--vscode-terminal-ansiCyan, #29b8db); }
+.src-1 { color: var(--vscode-terminal-ansiYellow, #e5e510); }
+.src-2 { color: var(--vscode-terminal-ansiMagenta, #bc3fbc); }
+.src-3 { color: var(--vscode-terminal-ansiGreen, #0dbc79); }
+.src-4 { color: var(--vscode-terminal-ansiBlue, #2472c8); }
+.src-5 { color: var(--vscode-terminal-ansiBrightRed, #f14c4c); }
+
+/* ───────────── protected contexts ───────────── */
+
+body.protected {
+  box-shadow: inset 0 3px 0 var(--ol-error);
+}
+
+.protected-banner {
+  display: none;
+  padding: 3px 14px;
+  font-weight: 600;
+  color: var(--vscode-statusBarItem-errorForeground, #fff);
+  background: var(--vscode-statusBarItem-errorBackground, #c72e0f);
+}
+
+body.protected .protected-banner {
+  display: block;
+}
+
+/* ───────────── revisions ───────────── */
+
+.rev-current {
+  font-weight: 600;
+}
+
+/* ───────────── topology ───────────── */
+
+.topology {
+  overflow: auto;
+  padding: 10px 14px 30px;
+}
+
+.topology svg {
+  display: block;
+}
+
+.topo-node rect {
+  fill: var(--ol-card);
+  stroke: var(--ol-border);
+  rx: 4;
+}
+
+.topo-node:hover rect {
+  stroke: var(--vscode-focusBorder);
+}
+
+.topo-node {
+  cursor: pointer;
+}
+
+.topo-node text {
+  fill: var(--vscode-foreground);
+  font-size: 11px;
+}
+
+.topo-node text.kind {
+  fill: var(--ol-muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.topo-node .status {
+  stroke: none;
+}
+
+.topo-node .status.tone-ok { fill: var(--ol-ok); }
+.topo-node .status.tone-warn { fill: var(--ol-warn); }
+.topo-node .status.tone-error { fill: var(--ol-error); }
+.topo-node .status.tone-muted { fill: var(--ol-muted); }
+.topo-node .status.tone-info { fill: var(--ol-info); }
+
+.topo-edge {
+  fill: none;
+  stroke: var(--ol-border);
+  stroke-width: 1.2;
+}
+
+.topo-edge.highlight {
+  stroke: var(--vscode-focusBorder);
+  stroke-width: 2;
+}
+
+.topo-column-title {
+  fill: var(--ol-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.series-rx.line {
+  stroke: var(--vscode-charts-green, #89d185);
+}
+
+.series-tx.line {
+  stroke: var(--vscode-charts-yellow, #cca700);
+}
+
+.legend-item.series-rx i {
+  background: var(--vscode-charts-green, #89d185);
+}
+
+.legend-item.series-tx i {
+  background: var(--vscode-charts-yellow, #cca700);
+}
+
+.metrics-source {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ───────────── menus ───────────── */
+
+.menu {
+  position: absolute;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--vscode-menu-border, var(--ol-border));
+  border-radius: 5px;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background, #252526));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 3px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.menu-item:hover {
+  color: var(--vscode-menu-selectionForeground, inherit);
+  background: var(--vscode-menu-selectionBackground, var(--ol-hover));
+}
+
+.menu-item.danger {
+  color: var(--ol-error);
+}

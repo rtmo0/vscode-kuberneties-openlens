@@ -1,0 +1,25 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3B7BF0"/>
+      <stop offset="1" stop-color="#1F4FB8"/>
+    </linearGradient>
+    <radialGradient id="lens" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(118 118) rotate(45) scale(48)">
+      <stop offset="0" stop-color="#F2FAFF"/>
+      <stop offset="1" stop-color="#7FD3FF"/>
+    </radialGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+  <path d="M128.0 32.0 L203.1 68.1 L221.6 149.4 L169.7 214.5 L86.3 214.5 L34.4 149.4 L52.9 68.1 Z" stroke="white" stroke-width="12" stroke-linejoin="round" fill="none"/>
+  <g stroke="white" stroke-width="11" stroke-linecap="round">
+    <path d="M128.0 82.0 L128.0 54.0"/>
+    <path d="M164.0 99.3 L185.9 81.9"/>
+    <path d="M172.8 138.2 L200.1 144.5"/>
+    <path d="M148.0 169.4 L160.1 194.7"/>
+    <path d="M108.0 169.4 L95.9 194.7"/>
+    <path d="M83.2 138.2 L55.9 144.5"/>
+    <path d="M92.0 99.3 L70.1 81.9"/>
+  </g>
+  <circle cx="128" cy="128" r="32" fill="url(#lens)" stroke="white" stroke-width="10"/>
+  <circle cx="118" cy="118" r="8" fill="white"/>
+</svg>
