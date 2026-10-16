@@ -16,7 +16,7 @@ export interface RangePoint {
 }
 
 const DETECT_CACHE_MS = 10 * 60_000;
-const detected = new WeakMap<ClusterSession, { at: number; endpoint: Promise<PrometheusEndpoint | undefined> }>();
+const detected = new WeakMap<ClusterSession, { at: number; endpoint: Promise<PrometheusEndpoint | undefined>; done?: { value: PrometheusEndpoint | undefined } }>();
 
 /** Well-known Prometheus services (kube-prometheus-stack, prometheus-community, Lens metrics, OpenShift…). */
 const WELL_KNOWN: Array<[string, string, string]> = [
@@ -85,16 +85,31 @@ export function prometheusFor(session: ClusterSession): Promise<PrometheusEndpoi
     } catch {
       // no cluster-wide service list; fall back to the well-known names
     }
-    for (const candidate of candidates) {
-      if (await responds(session, candidate)) {
-        logger.info(`Using Prometheus ${endpointLabel(candidate)} for ${session.context}`);
-        return candidate;
-      }
+    // Probe all candidates at once (most do not exist), then keep the first in priority order.
+    const answers = await Promise.all(candidates.map((candidate) => responds(session, candidate)));
+    const found = candidates.find((_candidate, index) => answers[index]);
+    if (found) {
+      logger.info(`Using Prometheus ${endpointLabel(found)} for ${session.context}`);
     }
-    return undefined;
+    return found;
   })();
-  detected.set(session, { at: Date.now(), endpoint });
+  const entry: { at: number; endpoint: Promise<PrometheusEndpoint | undefined>; done?: { value: PrometheusEndpoint | undefined } } = { at: Date.now(), endpoint };
+  endpoint.then((value) => { entry.done = { value }; }, () => { entry.done = { value: undefined }; });
+  detected.set(session, entry);
   return endpoint;
+}
+
+/**
+ * The endpoint when detection has already finished; otherwise starts it and answers
+ * undefined at once, so a first view uses metrics-server instead of waiting for probes.
+ */
+export async function knownPrometheus(session: ClusterSession): Promise<PrometheusEndpoint | undefined> {
+  const configured = getConfig().prometheus[session.context];
+  if (configured) {
+    return configured === 'off' ? undefined : parseEndpoint(configured);
+  }
+  void prometheusFor(session).catch(() => undefined);
+  return detected.get(session)?.done?.value;
 }
 
 export function forgetPrometheus(session: ClusterSession): void {

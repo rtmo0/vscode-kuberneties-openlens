@@ -2,6 +2,14 @@
 
 All notable changes to this extension are documented in this file.
 
+## 0.4.0 - 2026-10-16
+
+### Fixed
+
+- Details open at once with what the object itself contains (overview, containers, conditions, volumes, labels); metrics, events, pods and rollout history follow. The cluster `/version` check no longer delays them, and metrics, events, permissions and rollout history load in parallel (pod details on a slow VPN: first content in ~0.6 s and everything in ~1.9 s instead of ~13 s).
+- Probe the well-known Prometheus services in parallel instead of one after another (about 9 s on clusters without Prometheus), and show metrics-server data until detection finishes.
+- Record a details view as recently opened once per open, not on every refresh.
+
 ## 0.3.0 - 2026-10-16
 
 ### Added

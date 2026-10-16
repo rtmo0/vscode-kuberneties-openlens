@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 
 import type { ResourceActions, Target } from '../commands/resourceActions';
 import type { ClusterManager, ClusterSession, K8sObject } from '../core/cluster';
-import { buildServerTable, buildTable, buildTableSupplement, TableContext } from '../core/columns';
+import { buildServerTable, buildTable, buildTableSupplement, rowActions, TableContext } from '../core/columns';
 import { getConfig } from '../core/config';
 import { buildDashboard } from '../core/dashboard';
 import { buildDetails, MetricsHistory } from '../core/details';
@@ -13,7 +13,7 @@ import { confirmAction } from '../core/guard';
 import { errorMessage, isNotFound } from '../core/kubeRest';
 import { allowedActions } from '../core/permissions';
 import { logger } from '../core/logger';
-import type { ActionId, Cell, ObjectRef, ResourceTableData, Row, TableData, TableInit, TablePatch, TableRowUpdate, TableSupplement } from '../core/protocol';
+import type { ActionId, Cell, DetailsData, ObjectRef, ResourceTableData, Row, TableData, TableInit, TablePatch, TableRowUpdate, TableSupplement } from '../core/protocol';
 import { getKind, registerCustomKind, ResourceKind } from '../core/resources';
 import type { ResourceWatcher } from '../core/watch';
 import { BaseWebviewPanel } from './baseWebview';
@@ -543,6 +543,8 @@ export class DetailsPanel extends BaseWebviewPanel {
   private metricsRange = 3600;
   private current: ObjectRef;
   private currentObject?: K8sObject;
+  /** The object already shown, so polling refreshes skip the quick first pass. */
+  private shown?: ObjectRef;
 
   private constructor(
     private readonly services: PanelServices,
@@ -726,8 +728,9 @@ export class DetailsPanel extends BaseWebviewPanel {
     const ref = this.current;
     try {
       const session = this.services.clusters.session(this.context);
-      await session.connect();
-      const kind = await session.kind(ref.kindId);
+      // /version is for the cluster status only; it must not delay the object.
+      void session.connect().catch(() => undefined);
+      const kind = getKind(ref.kindId) ?? await session.kind(ref.kindId);
       let obj: K8sObject;
       if (kind.id === 'helmreleases') {
         const secrets = await session.list(getKind('secrets')!, ref.namespace ?? '', { labelSelector: `owner=helm,name=${ref.name}` });
@@ -743,15 +746,31 @@ export class DetailsPanel extends BaseWebviewPanel {
         return;
       }
       this.currentObject = obj;
-      const details = await buildDetails(session, kind, obj, this.metrics, { range: this.metricsRange });
-      const allowed = await allowedActions(session, kind, obj.metadata.namespace, details.actions);
-      details.actions = details.actions.filter((a) => allowed.has(a));
-      details.pinned = this.services.favorites.isPinned(this.context, ref);
-      details.ref = ref;
-      if (ref === this.current) {
+      const permissions = allowedActions(session, kind, obj.metadata.namespace, rowActions(kind.id, obj));
+      const publish = (details: DetailsData, allowed: Set<ActionId>): void => {
+        details.actions = details.actions.filter((a) => allowed.has(a));
+        details.pinned = this.services.favorites.isPinned(this.context, ref);
+        details.ref = ref;
+        if (ref === this.current) {
+          this.post('data', { ref, details, canGoBack: this.history.length > 0 });
+        }
+      };
+      if (this.shown !== ref && kind.id !== 'helmreleases') {
+        // Show the object at once; actions appear once allowed, metrics and events follow.
+        this.shown = ref;
         this.services.actions.onOpened(this.context, ref);
-        this.post('data', { ref, details, canGoBack: this.history.length > 0 });
+        // Permissions are usually cached by the table; otherwise the buttons come with the full details.
+        const known = await Promise.race([permissions, new Promise<undefined>((resolve) => setTimeout(resolve, 0))]).catch(() => undefined);
+        publish(await buildDetails(session, kind, obj, this.metrics, { range: this.metricsRange, quick: true }), known ?? new Set());
       }
+      const details = await buildDetails(session, kind, obj, this.metrics, { range: this.metricsRange });
+      await permissions.catch(() => undefined);
+      const allowed = await allowedActions(session, kind, obj.metadata.namespace, details.actions);
+      if (this.shown !== ref) {
+        this.shown = ref;
+        this.services.actions.onOpened(this.context, ref);
+      }
+      publish(details, allowed);
     } catch (err) {
       if (ref !== this.current) {
         return;

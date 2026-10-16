@@ -8,7 +8,7 @@ import type { ContainerInfo, DetailsData, KeyValue, MetricPoint, MetricSeries, S
 import { apiVersionOf, findKindByKind, getKind, ResourceKind } from './resources';
 import { toYaml } from '../fs/resourceFs';
 import { ROLLOUT_KINDS, rolloutHistory } from './workloadOps';
-import { endpointLabel, fetchSeries, MetricQueries, nodeQueries, podQueries, prometheusFor } from './prometheus';
+import { endpointLabel, fetchSeries, knownPrometheus, MetricQueries, nodeQueries, podQueries, prometheusFor } from './prometheus';
 import {
   containerState,
   nodeRoles,
@@ -44,7 +44,14 @@ export class MetricsHistory {
 export interface DetailsOptions {
   /** Metrics range in seconds, when Prometheus is available. */
   range: number;
+  /**
+   * Only what the object itself contains, with no further API calls: shown at once
+   * while metrics, events and related objects load.
+   */
+  quick?: boolean;
 }
+
+const LOADING = 'Loading…';
 
 export async function buildDetails(session: ClusterSession, kind: ResourceKind, obj: K8sObject, history: MetricsHistory, options: DetailsOptions = { range: 3600 }): Promise<DetailsData> {
   const sections: Section[] = [];
@@ -54,16 +61,24 @@ export async function buildDetails(session: ClusterSession, kind: ResourceKind, 
   if (kind.id === 'helmreleases') {
     return helmDetails(session, obj);
   }
+  const quick = !!options.quick;
+  // Independent requests start together instead of one after another.
+  const events = kind.id === 'events' || quick ? undefined : eventsSection(session, kind, obj);
+  if (!quick && ['pods', 'deployments', 'statefulsets', 'daemonsets', 'replicasets', 'jobs', 'nodes'].includes(kind.id)) {
+    void prometheusFor(session).catch(() => undefined);
+  }
 
   sections.push({ type: 'kv', title: 'Overview', items: overview(kind, obj) });
 
   switch (kind.id) {
     case 'pods': {
       status = podStatus(obj);
-      const metrics = await session.podMetrics(ns);
+      const metrics = quick ? undefined : await session.podMetrics(ns);
       const usage = metrics?.get(`${ns}/${obj.metadata.name}`);
       sections.push({ type: 'kv', title: 'Pod', items: podInfo(obj) });
-      sections.push(await metricsSection(session, `pod:${obj.metadata.uid}`, history, usage, [obj], podQueries(ns ?? '', [obj.metadata.name]), options.range));
+      sections.push(quick
+        ? { type: 'metrics', title: 'Metrics', series: [], unavailable: LOADING }
+        : await metricsSection(session, `pod:${obj.metadata.uid}`, history, usage, [obj], podQueries(ns ?? '', [obj.metadata.name]), options.range));
       sections.push({ type: 'containers', title: 'Containers', items: containers(obj, usage), podName: obj.metadata.name, namespace: ns ?? '' });
       sections.push(conditions(obj));
       sections.push({ type: 'kv', title: 'Volumes', items: volumes(obj) });
@@ -77,9 +92,12 @@ export async function buildDetails(session: ClusterSession, kind: ResourceKind, 
       const health = workloadHealth(obj, kind.id);
       status = { text: `${health.ready}/${health.desired} ready`, tone: health.tone };
       sections.push({ type: 'kv', title: 'Spec', items: workloadInfo(kind.id, obj) });
-      sections.push(...(await podsSections(session, obj, kind.id, history, options.range)));
-      if (ROLLOUT_KINDS.has(kind.id)) {
-        sections.push(await revisionsSection(session, kind.id, obj));
+      const revisions = ROLLOUT_KINDS.has(kind.id) && !quick ? revisionsSection(session, kind.id, obj) : undefined;
+      if (!quick) {
+        sections.push(...(await podsSections(session, obj, kind.id, history, options.range)));
+      }
+      if (revisions) {
+        sections.push(await revisions);
       }
       sections.push(conditions(obj));
       break;
@@ -98,9 +116,11 @@ export async function buildDetails(session: ClusterSession, kind: ResourceKind, 
           { key: 'Images', value: images(obj.spec?.jobTemplate?.spec?.template) }
         ]
       });
-      const jobs = await session.list(getKind('jobs')!, ns ?? '');
-      const owned = jobs.items.filter((j) => (j.metadata.ownerReferences ?? []).some((o: any) => o.uid === obj.metadata.uid));
-      sections.push({ type: 'table', title: 'Jobs', data: buildTable(getKind('jobs')!, owned, {}) });
+      if (!quick) {
+        const jobs = await session.list(getKind('jobs')!, ns ?? '');
+        const owned = jobs.items.filter((j) => (j.metadata.ownerReferences ?? []).some((o: any) => o.uid === obj.metadata.uid));
+        sections.push({ type: 'table', title: 'Jobs', data: buildTable(getKind('jobs')!, owned, {}) });
+      }
       break;
     }
     case 'services': {
@@ -129,7 +149,9 @@ export async function buildDetails(session: ClusterSession, kind: ResourceKind, 
           nodePort: p.nodePort
         }))
       });
-      sections.push(...(await podsSections(session, obj, kind.id, history, options.range)));
+      if (!quick) {
+        sections.push(...(await podsSections(session, obj, kind.id, history, options.range)));
+      }
       break;
     }
     case 'ingresses':
@@ -137,7 +159,9 @@ export async function buildDetails(session: ClusterSession, kind: ResourceKind, 
       break;
     case 'nodes': {
       status = nodeStatus(obj);
-      sections.push(...(await nodeSections(session, obj, history, options.range)));
+      if (!quick) {
+        sections.push(...(await nodeSections(session, obj, history, options.range)));
+      }
       break;
     }
     case 'secrets':
@@ -188,8 +212,10 @@ export async function buildDetails(session: ClusterSession, kind: ResourceKind, 
   const annotations = Object.entries(obj.metadata.annotations ?? {}).filter(([key]) => key !== 'kubectl.kubernetes.io/last-applied-configuration');
   sections.push({ type: 'labels', title: 'Annotations', items: annotations.map(([key, value]) => ({ key, value: String(value) })) });
 
-  if (kind.id !== 'events') {
-    sections.push(await eventsSection(session, kind, obj));
+  if (events) {
+    sections.push(await events);
+  } else if (kind.id !== 'events') {
+    sections.push({ type: 'events', title: `Events (${LOADING.toLowerCase()})`, items: [] });
   }
 
   return {
@@ -429,7 +455,7 @@ async function metricsSection(
   queries: MetricQueries | undefined,
   range: number
 ): Promise<Section> {
-  const endpoint = queries ? await prometheusFor(session) : undefined;
+  const endpoint = queries ? await knownPrometheus(session) : undefined;
   const prom = endpoint && queries ? await fetchSeries(session, endpoint, queries, range) : undefined;
   if (!usage && !prom) {
     return { type: 'metrics', title: 'Metrics', series: [], unavailable: session.metricsStatus ?? 'Metrics are not available.' };
@@ -518,7 +544,7 @@ async function nodeSections(session: ClusterSession, node: K8sObject, history: M
       { label: 'Pods', used: pods.length, capacity: parseQuantity(node.status?.allocatable?.pods), format: 'count' }
     ]
   });
-  const endpoint = await prometheusFor(session);
+  const endpoint = await knownPrometheus(session);
   const prom = endpoint ? await fetchSeries(session, endpoint, nodeQueries(node.metadata.name), range) : undefined;
   if (usage || prom) {
     sections.push({
