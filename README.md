@@ -1,6 +1,6 @@
 # Kubernetes Explorer & OpenLens Tools
 
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/rtmo0)
+[![Support on Boosty](https://img.shields.io/badge/Boosty-support-F15F2C?logo=boosty&logoColor=white)](https://boosty.to/rtm00)
 
 An independent, OpenLens-style Kubernetes IDE for VS Code: a cluster overview, every workload and resource in sortable tables, pods with live CPU and memory metrics, logs, shells, port forwarding, secrets, Helm releases, YAML editing, and safe import of kubeconfigs you receive as a file or as text.
 
@@ -142,7 +142,7 @@ Press <kbd>F5</kbd> to launch the Extension Development Host.
 
 ## Support
 
-Kubernetes Explorer & OpenLens Tools is free and open source. If it saves you time, you can support its development on [Buy Me a Coffee](https://buymeacoffee.com/rtmo0). Bug reports and pull requests are just as welcome.
+Kubernetes Explorer & OpenLens Tools is free and open source. If it saves you time, you can support its development on [Boosty](https://boosty.to/rtm00). Bug reports and pull requests are just as welcome.
 
 ## License
 

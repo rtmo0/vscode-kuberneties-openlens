@@ -2,6 +2,12 @@
 
 All notable changes to this extension are documented in this file.
 
+## 1.3.1 - 2026-10-16
+
+### Changed
+
+- The **Sponsor** button and README support link now point to Boosty instead of Buy Me a Coffee.
+
 ## 1.3.0 - 2026-10-16
 
 ### Added
