@@ -25,6 +25,8 @@ export abstract class BaseWebviewPanel implements vscode.Disposable {
   protected readonly disposables: vscode.Disposable[] = [];
   private readonly handlers = new Map<string, MessageHandler>();
   private disposed = false;
+  private clientReady = false;
+  private readonly pendingPosts: Array<{ type: string; payload: unknown }> = [];
 
   /** Unique key used to reuse an already-open panel. */
   protected abstract get panelKey(): string;
@@ -70,6 +72,13 @@ export abstract class BaseWebviewPanel implements vscode.Disposable {
     BaseWebviewPanel.openPanels.set(this.panelKey, this);
 
     this.panel.webview.html = this.renderHtml();
+    this.registerHandler('ready', (_message, respond) => {
+      this.clientReady = true;
+      for (const { type, payload } of this.pendingPosts.splice(0)) {
+        this.post(type, payload);
+      }
+      respond(true);
+    });
     this.registerHandler('meta', (_message, respond) => respond(this.meta()));
     this.disposables.push(onConfigChanged(() => this.post('meta', this.meta())));
     this.panel.webview.onDidReceiveMessage(
@@ -87,6 +96,7 @@ export abstract class BaseWebviewPanel implements vscode.Disposable {
   protected startPolling(tick: () => Promise<void>, seconds: () => number): void {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let running = false;
+    let requested = false;
     const schedule = (): void => {
       if (timer) {
         clearTimeout(timer);
@@ -110,7 +120,12 @@ export abstract class BaseWebviewPanel implements vscode.Disposable {
         running = false;
       }
       if (!this.disposed) {
-        schedule();
+        if (requested) {
+          requested = false;
+          void run();
+        } else {
+          schedule();
+        }
       }
     };
     this.panel.onDidChangeViewState(
@@ -124,6 +139,10 @@ export abstract class BaseWebviewPanel implements vscode.Disposable {
     );
     this.disposables.push({ dispose: () => timer && clearTimeout(timer) });
     this.pollNow = () => {
+      if (running) {
+        requested = true;
+        return Promise.resolve();
+      }
       if (timer) {
         clearTimeout(timer);
         timer = undefined;
@@ -157,6 +176,11 @@ export abstract class BaseWebviewPanel implements vscode.Disposable {
 
   protected post(type: string, payload?: unknown): void {
     if (this.disposed) {
+      return;
+    }
+    if (!this.clientReady) {
+      // Fast responses can arrive before the webview has installed its listeners.
+      this.pendingPosts.push({ type, payload });
       return;
     }
     void this.panel.webview.postMessage({ type, payload } satisfies WebviewMessage);
@@ -203,6 +227,7 @@ export abstract class BaseWebviewPanel implements vscode.Disposable {
 
   protected onDispose(): void {
     this.disposed = true;
+    this.pendingPosts.length = 0;
     if (BaseWebviewPanel.openPanels.get(this.panelKey) === this) {
       BaseWebviewPanel.openPanels.delete(this.panelKey);
     }

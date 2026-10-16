@@ -338,6 +338,31 @@ table.grid th.sortable {
   cursor: pointer;
 }
 
+table.grid th {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.col-resizer:hover,
+body.resizing-column .col-resizer:active {
+  border-right: 2px solid var(--vscode-focusBorder, var(--ol-border));
+}
+
+body.resizing-column {
+  cursor: col-resize;
+  user-select: none;
+}
+
 table.grid th.sortable:hover {
   color: var(--vscode-foreground);
 }
@@ -893,6 +918,22 @@ pre.code {
   padding: 40px;
   text-align: center;
   color: var(--ol-muted);
+}
+
+.sorting-overlay {
+  position: fixed;
+  inset: 45px 0 0;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--ol-muted);
+  background: var(--vscode-editor-background);
+  cursor: progress;
+}
+
+.sorting-overlay.visible {
+  display: flex;
 }
 
 .spinner {

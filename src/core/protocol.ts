@@ -73,6 +73,8 @@ export interface TableData {
   columns: Column[];
   rows: Row[];
   notice?: string;
+  /** Progress shown while additional rows or metadata are still loading. */
+  loading?: string;
   metricsAvailable?: boolean;
 }
 
@@ -84,6 +86,36 @@ export interface TableInit {
   namespace: string;
   namespaces: string[];
   bulkActions: ActionId[];
+}
+
+/** A resource scope changes on namespace switches; late background results are ignored. */
+export interface ResourceTableData extends TableData {
+  namespace: string;
+  scope: number;
+}
+
+/** Changes since the last `data`/`patch` of the same scope; rows not listed are unchanged. */
+export interface TablePatch {
+  scope: number;
+  namespace: string;
+  upsert: Row[];
+  remove: string[];
+  notice?: string;
+  loading?: string;
+  metricsAvailable?: boolean;
+}
+
+export interface TableRowUpdate {
+  key: string;
+  cells?: Record<string, Cell>;
+  actions?: ActionId[];
+}
+
+export interface TableSupplement {
+  scope: number;
+  rows: TableRowUpdate[];
+  /** An empty string clears the metrics notice. */
+  metricsNotice?: string;
 }
 
 // ─────────────────────────── details ───────────────────────────

@@ -1,5 +1,6 @@
 import * as http from 'http';
 import * as https from 'https';
+import * as zlib from 'zlib';
 import type { KubeConfig } from '@kubernetes/client-node';
 
 export class KubeApiError extends Error {
@@ -22,6 +23,8 @@ export interface RestOptions {
   accept?: string;
   /** Request timeout; 0 disables it (used for streams). */
   timeoutMs?: number;
+  /** Ask for a gzip-compressed response (large lists are 10–20× smaller); not for streams. */
+  compressed?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -51,7 +54,7 @@ export class KubeRest {
   }
 
   async text(method: string, path: string, options: RestOptions = {}): Promise<string> {
-    const res = await this.open(method, path, options);
+    const res = await this.open(method, path, { compressed: true, ...options });
     return readBody(res);
   }
 
@@ -103,7 +106,7 @@ export class KubeRest {
 
     const requestOptions: https.RequestOptions = {
       method,
-      headers: { Accept: options.accept ?? 'application/json' }
+      headers: { Accept: options.accept ?? 'application/json', ...(options.compressed ? { 'Accept-Encoding': 'gzip' } : {}) }
     };
     if (url.protocol === 'http:') {
       // The client refuses plain HTTP outright, but kubectl allows it (e.g. `kubectl proxy`):
@@ -155,9 +158,13 @@ export class KubeRest {
 function readBody(res: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    res.on('data', (chunk: Buffer) => chunks.push(chunk));
-    res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    res.on('error', reject);
+    const body = res.headers['content-encoding'] === 'gzip' ? res.pipe(zlib.createGunzip()) : res;
+    if (body !== res) {
+      res.on('error', reject);
+    }
+    body.on('data', (chunk: Buffer) => chunks.push(chunk));
+    body.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    body.on('error', reject);
   });
 }
 

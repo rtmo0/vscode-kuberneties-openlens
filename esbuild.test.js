@@ -17,6 +17,11 @@ const common = { bundle: true, format: 'cjs', platform: 'node', target: 'node18'
 
 Promise.all([
   esbuild.build({
+    entryPoints: [path.join(__dirname, 'src', 'webviews', 'table', 'index.ts')],
+    outfile: path.join(__dirname, 'out', 'test', 'table-client.js'),
+    bundle: true, platform: 'browser', format: 'iife', target: 'es2020', logLevel: 'warning'
+  }),
+  esbuild.build({
     ...common,
     entryPoints: entries(path.join(__dirname, 'test')),
     outdir: path.join(__dirname, 'out', 'test'),

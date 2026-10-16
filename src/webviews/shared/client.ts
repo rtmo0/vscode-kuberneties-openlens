@@ -20,6 +20,8 @@ interface PendingRequest {
 const pending = new Map<string, PendingRequest>();
 const listeners = new Map<string, Set<(payload: unknown) => void>>();
 
+queueMicrotask(() => void request('ready').catch(() => undefined));
+
 let requestCounter = 0;
 
 window.addEventListener('message', (event: MessageEvent) => {
@@ -351,10 +353,84 @@ export interface TableOptions {
   onRowClick?: (row: Row) => void;
   onAction?: (action: ActionId, row: Row) => void;
   selection?: Set<string>;
+  selectionRows?: () => Row[];
   onSelect?: () => void;
   kindId: string;
   limit?: number;
+  offset?: number;
+  rowElements?: Map<string, { cells: Map<string, HTMLElement>; actions?: HTMLElement }>;
+  /**
+   * Rows rendered last time, keyed by row key. An entry is reused when the row
+   * object and its selection are unchanged; the caller clears it when columns change.
+   */
+  renderedRows?: Map<string, RenderedRow>;
+  /** User-set column widths in px; columns without one keep the default CSS limits. */
+  widths?: Record<string, number>;
+  /** Enables resize handles on the header; called when a drag or auto-fit ends. */
+  onResize?: (column: string, width: number) => void;
 }
+
+const MIN_COLUMN_WIDTH = 40;
+
+function setColumnWidth(node: HTMLElement, width: number | undefined): void {
+  const value = width ? `${width}px` : '';
+  node.style.width = value;
+  node.style.minWidth = value;
+  node.style.maxWidth = value;
+}
+
+/** Drag the right edge of a header to resize its column; double-click fits the widest value shown. */
+function resizeHandle(th: HTMLElement, cells: () => HTMLElement[], onResize: (width: number) => void): HTMLElement {
+  const handle = el('span', { className: 'col-resizer', title: 'Drag to resize, double-click to fit' });
+  const apply = (width: number): void => {
+    setColumnWidth(th, width);
+    cells().forEach((cell) => setColumnWidth(cell, width));
+  };
+  handle.addEventListener('click', (event) => event.stopPropagation());
+  handle.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = th.getBoundingClientRect().width;
+    let width = Math.round(startWidth);
+    handle.setPointerCapture(event.pointerId);
+    document.body.classList.add('resizing-column');
+    const move = (e: PointerEvent): void => {
+      width = Math.max(MIN_COLUMN_WIDTH, Math.round(startWidth + e.clientX - startX));
+      apply(width);
+    };
+    const up = (): void => {
+      handle.removeEventListener('pointermove', move);
+      document.body.classList.remove('resizing-column');
+      onResize(width);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up, { once: true });
+    handle.addEventListener('pointercancel', up, { once: true });
+  });
+  handle.addEventListener('dblclick', (event) => {
+    event.stopPropagation();
+    const nodes = [th, ...cells()];
+    nodes.forEach((node) => {
+      setColumnWidth(node, undefined);
+      node.style.maxWidth = 'none';
+    });
+    const width = Math.max(MIN_COLUMN_WIDTH, ...nodes.map((node) => node.scrollWidth + 1));
+    apply(width);
+    onResize(width);
+  });
+  return handle;
+}
+
+export interface RenderedRow {
+  row: Row;
+  selected: boolean;
+  tr: HTMLTableRowElement;
+  elements: { cells: Map<string, HTMLElement>; actions?: HTMLElement };
+}
+
+const cellCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+const nameCollator = new Intl.Collator();
 
 export function compareCells(a: Cell | undefined, b: Cell | undefined): number {
   const va = a?.sort ?? a?.text ?? '';
@@ -362,7 +438,7 @@ export function compareCells(a: Cell | undefined, b: Cell | undefined): number {
   if (typeof va === 'number' && typeof vb === 'number') {
     return va - vb;
   }
-  return String(va).localeCompare(String(vb), undefined, { numeric: true, sensitivity: 'base' });
+  return cellCollator.compare(String(va), String(vb));
 }
 
 export function sortRows(data: TableData, sort?: { column: string; desc: boolean }): Row[] {
@@ -373,8 +449,35 @@ export function sortRows(data: TableData, sort?: { column: string; desc: boolean
   if (index < 0) {
     return data.rows;
   }
-  const rows = [...data.rows].sort((a, b) => compareCells(a.cells[index], b.cells[index]) || a.name.localeCompare(b.name));
+  const rows = [...data.rows].sort((a, b) => compareCells(a.cells[index], b.cells[index]) || nameCollator.compare(a.name, b.name));
   return sort.desc ? rows.reverse() : rows;
+}
+
+/** Replace only the action buttons when permission checks finish. */
+export function renderRowActions(actions: HTMLElement, row: Row, onAction: (action: ActionId, row: Row) => void): void {
+  clear(actions);
+  const inline = row.actions.filter((a) => INLINE_ACTIONS.has(a));
+  const rest = row.actions.filter((a) => !INLINE_ACTIONS.has(a));
+  for (const action of inline) {
+    actions.append(actionButton(action, () => onAction(action, row)));
+  }
+  if (rest.length === 1 && !inline.length) {
+    actions.append(actionButton(rest[0], () => onAction(rest[0], row)));
+  } else if (rest.length) {
+    actions.append(
+      iconButton('more', 'More actions', (event) =>
+        showMenu(
+          event.currentTarget as HTMLElement,
+          rest.map((action) => ({
+            label: ACTION_TITLES[action],
+            icon: action,
+            danger: action === 'delete' || action === 'helmUninstall',
+            run: () => onAction(action, row)
+          }))
+        )
+      )
+    );
+  }
 }
 
 /** Render a resource table; used by the table page and nested tables in details. */
@@ -388,7 +491,7 @@ export function renderTable(data: TableData, rows: Row[], options: TableOptions)
     const all = el('input', { type: 'checkbox', title: 'Select all' });
     all.checked = rows.length > 0 && rows.every((r) => options.selection!.has(r.key));
     all.addEventListener('change', () => {
-      for (const row of rows) {
+      for (const row of options.selectionRows?.() ?? rows) {
         if (all.checked) {
           options.selection!.add(row.key);
         } else {
@@ -399,8 +502,15 @@ export function renderTable(data: TableData, rows: Row[], options: TableOptions)
     });
     head.append(el('th', { className: 'check' }, all));
   }
+  // Cells per column of this render, for live resizing.
+  const columnCells = new Map<string, HTMLElement[]>(visible.map(({ column }) => [column.id, []]));
   for (const { column } of visible) {
-    const th = el('th', { className: column.align === 'right' ? 'right' : '' }, column.title);
+    const th = el('th', { className: `${column.align === 'right' ? 'right' : ''} col-${column.id}`.trim() }, column.title);
+    if (options.onResize) {
+      const id = column.id;
+      th.append(resizeHandle(th, () => columnCells.get(id) ?? [], (width) => options.onResize!(id, width)));
+    }
+    setColumnWidth(th, options.widths?.[column.id]);
     if (options.onSort) {
       th.classList.add('sortable');
       if (options.sort?.column === column.id) {
@@ -416,9 +526,26 @@ export function renderTable(data: TableData, rows: Row[], options: TableOptions)
   table.append(el('thead', {}, head));
 
   const body = el('tbody');
-  const limited = options.limit ? rows.slice(0, options.limit) : rows;
+  const offset = options.offset ?? 0;
+  const limited = options.limit ? rows.slice(offset, offset + options.limit) : rows;
+  const rendered = new Map<string, RenderedRow>();
   for (const row of limited) {
+    const selected = !!options.selection?.has(row.key);
+    const reused = options.renderedRows?.get(row.key);
+    if (reused && reused.row === row && reused.selected === selected) {
+      for (const [id, td] of reused.elements.cells) {
+        setColumnWidth(td, options.widths?.[id]);
+        columnCells.get(id)?.push(td);
+      }
+      options.rowElements?.set(row.key, reused.elements);
+      rendered.set(row.key, reused);
+      body.append(reused.tr);
+      continue;
+    }
     const tr = el('tr');
+    const elements: { cells: Map<string, HTMLElement>; actions?: HTMLElement } = { cells: new Map() };
+    options.rowElements?.set(row.key, elements);
+    rendered.set(row.key, { row, selected, tr, elements });
     if (options.selection) {
       const box = el('input', { type: 'checkbox' });
       box.checked = options.selection.has(row.key);
@@ -438,32 +565,16 @@ export function renderTable(data: TableData, rows: Row[], options: TableOptions)
     }
     for (const { column, index } of visible) {
       const cell = row.cells[index] ?? { text: '' };
-      tr.append(el('td', { className: `${column.align === 'right' ? 'right' : ''} col-${column.id}` }, renderCell(cell, options.onOpen)));
+      const td = el('td', { className: `${column.align === 'right' ? 'right' : ''} col-${column.id}` }, renderCell(cell, options.onOpen));
+      setColumnWidth(td, options.widths?.[column.id]);
+      columnCells.get(column.id)!.push(td);
+      elements.cells.set(column.id, td);
+      tr.append(td);
     }
     if (options.onAction) {
       const actions = el('td', { className: 'actions' });
-      const inline = row.actions.filter((a) => INLINE_ACTIONS.has(a));
-      const rest = row.actions.filter((a) => !INLINE_ACTIONS.has(a));
-      for (const action of inline) {
-        actions.append(actionButton(action, () => options.onAction!(action, row)));
-      }
-      if (rest.length === 1 && !inline.length) {
-        actions.append(actionButton(rest[0], () => options.onAction!(rest[0], row)));
-      } else if (rest.length) {
-        actions.append(
-          iconButton('more', 'More actions', (event) =>
-            showMenu(
-              event.currentTarget as HTMLElement,
-              rest.map((action) => ({
-                label: ACTION_TITLES[action],
-                icon: action,
-                danger: action === 'delete' || action === 'helmUninstall',
-                run: () => options.onAction!(action, row)
-              }))
-            )
-          )
-        );
-      }
+      renderRowActions(actions, row, options.onAction);
+      elements.actions = actions;
       tr.append(actions);
     }
     if (options.onRowClick) {
@@ -471,6 +582,10 @@ export function renderTable(data: TableData, rows: Row[], options: TableOptions)
       tr.addEventListener('click', () => options.onRowClick!(row));
     }
     body.append(tr);
+  }
+  if (options.renderedRows) {
+    options.renderedRows.clear();
+    rendered.forEach((entry, key) => options.renderedRows!.set(key, entry));
   }
   table.append(body);
   return table;

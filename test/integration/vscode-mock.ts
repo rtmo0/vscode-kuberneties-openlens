@@ -34,6 +34,7 @@ export class Disposable {
     this.onDispose();
   }
 }
+export const ViewColumn = { Active: -1 };
 export const FileType = { File: 1 };
 export const FileChangeType = { Changed: 1 };
 export const ConfigurationTarget = { Global: 1 };

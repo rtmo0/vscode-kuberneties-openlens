@@ -4,15 +4,16 @@ import * as vscode from 'vscode';
 
 import type { ResourceActions, Target } from '../commands/resourceActions';
 import type { ClusterManager, ClusterSession, K8sObject } from '../core/cluster';
-import { buildServerTable, buildTable, TableContext } from '../core/columns';
+import { buildServerTable, buildTable, buildTableSupplement, TableContext } from '../core/columns';
 import { getConfig } from '../core/config';
 import { buildDashboard } from '../core/dashboard';
 import { buildDetails, MetricsHistory } from '../core/details';
 import { buildTopology } from '../core/topology';
 import { confirmAction } from '../core/guard';
 import { errorMessage, isNotFound } from '../core/kubeRest';
-import { allowedActions, filterRowActions } from '../core/permissions';
-import type { ActionId, ObjectRef, TableInit } from '../core/protocol';
+import { allowedActions } from '../core/permissions';
+import { logger } from '../core/logger';
+import type { ActionId, Cell, ObjectRef, ResourceTableData, Row, TableData, TableInit, TablePatch, TableRowUpdate, TableSupplement } from '../core/protocol';
 import { getKind, registerCustomKind, ResourceKind } from '../core/resources';
 import type { ResourceWatcher } from '../core/watch';
 import { BaseWebviewPanel } from './baseWebview';
@@ -126,6 +127,9 @@ export class DashboardPanel extends BaseWebviewPanel {
 
 const BULK_ACTIONS: ActionId[] = ['delete', 'restart', 'suspend', 'resume', 'cordon', 'uncordon'];
 
+/** Namespaces whose row actions are checked concurrently (one rules review each). */
+const PERMISSION_BATCH = 4;
+
 export class ResourceTablePanel extends BaseWebviewPanel {
   private static readonly panels = new Map<string, ResourceTablePanel>();
 
@@ -154,17 +158,26 @@ export class ResourceTablePanel extends BaseWebviewPanel {
     this.registerHandler('init', async (_message, respond) => {
       const session = this.services.clusters.session(this.context);
       const kind = await session.kind(this.kindId);
-      const namespaces = kind.namespaced ? await session.namespaces().catch(() => []) : [];
       const init: TableInit = {
         context: this.context,
         kindId: this.kindId,
         title: kind.title,
         namespaced: kind.namespaced,
         namespace: this.services.clusters.namespaceFilter(this.context),
-        namespaces,
+        namespaces: [],
         bulkActions: BULK_ACTIONS
       };
       respond(init);
+    });
+    this.registerHandler('painted', (message, respond) => {
+      const { scope } = message.payload as { scope: number };
+      respond(true);
+      if (scope !== this.scope || this.tableDisposed || this.painted) {
+        return;
+      }
+      this.painted = true;
+      logger.info('Resource table first paint', { kind: this.kindId, rows: this.rawRows.size, elapsedMs: Date.now() - this.loadStarted });
+      this.enrich();
     });
     this.registerHandler('setNamespace', async (message, respond) => {
       const { namespace } = message.payload as { namespace: string };
@@ -207,95 +220,302 @@ export class ResourceTablePanel extends BaseWebviewPanel {
     return 'table';
   }
 
-  private watch?: { key: string; watcher: ResourceWatcher; release: () => void };
+  private watch?: { watcher: ResourceWatcher; release: () => void };
+  private session?: ClusterSession;
+  private kind?: ResourceKind;
+  private namespace = '';
+  private scopeKey?: string;
+  private scope = 0;
+  private painted = false;
+  private firstRowsSent = false;
+  private loadStarted = Date.now();
   private tableContext: TableContext = {};
+  private rawRows = new Map<string, Row>();
+  /** Rows of unchanged watch objects are reused instead of rebuilt. */
+  private rowCache = new WeakMap<K8sObject, Row>();
+  /** What the webview holds for this scope; later renders only send the difference. */
+  private sent = new Map<string, { row: Row; json?: string }>();
+  private sentColumns?: string;
+  private columnIndex = new Map<string, number>();
+  private readonly permissions = new Map<string, { checked: Set<ActionId>; allowed: Set<ActionId>; at: number }>();
+  private permissionsRunning = false;
+  private nodePods?: { release: () => void };
+  private renderTimer?: ReturnType<typeof setTimeout>;
+  private tableDisposed = false;
+  private metricsScope?: number;
+  private metricsAt = 0;
+  private namespacesSession?: ClusterSession;
 
-  /** Poll tick: metrics (and the whole list for custom resources, which are not watched). */
+  private scheduleRender(): void {
+    if (this.tableDisposed || !this.panel.visible || this.renderTimer) {
+      return;
+    }
+    // The first batch should be posted as soon as it arrives. Later watch bursts are coalesced.
+    if (!this.firstRowsSent) {
+      this.render();
+      return;
+    }
+    this.renderTimer = setTimeout(() => {
+      this.renderTimer = undefined;
+      if (this.panel.visible) {
+        this.render();
+      }
+    }, 100);
+  }
+
+  private current(scope: number): boolean {
+    return !this.tableDisposed && scope === this.scope &&
+      this.namespace === this.services.clusters.namespaceFilter(this.context);
+  }
+
+  private supplement(update: Omit<TableSupplement, 'scope'>): void {
+    this.post('supplement', { ...update, scope: this.scope } satisfies TableSupplement);
+  }
+
+  /** Start optional work only after the webview has painted its first resource batch. */
+  private enrich(): void {
+    if (!this.painted || !this.current(this.scope) || !this.panel.visible || !this.session || !this.kind) {
+      return;
+    }
+    const session = this.session;
+    const scope = this.scope;
+    // /version is useful for cluster status, but must never gate resource access.
+    void session.connect().catch(() => undefined);
+    if (this.kind.namespaced && this.namespacesSession !== session) {
+      this.namespacesSession = session;
+      void session.namespaces().then((names) => {
+        if (!this.tableDisposed && this.session === session) {
+          this.post('namespaces', names);
+        }
+      }).catch(() => undefined);
+    }
+    if (this.kind.id === 'nodes') {
+      this.watchNodePods(session);
+    }
+    if ((this.kind.id === 'pods' || this.kind.id === 'nodes') && this.metricsScope !== scope &&
+        Date.now() - this.metricsAt >= getConfig().refreshInterval * 1000) {
+      this.metricsScope = scope;
+      void this.refreshMetrics(session, this.kind, this.namespace, scope)
+        .catch((err) => {
+          if (this.current(scope)) { this.supplement({ rows: [], metricsNotice: errorMessage(err) }); }
+        })
+        .finally(() => { if (this.metricsScope === scope) { this.metricsScope = undefined; } });
+    }
+    void this.refreshActions();
+  }
+
+  /** Share counts with the Pods tab, after the Nodes table is already visible. */
+  private watchNodePods(session: ClusterSession): void {
+    if (this.nodePods) { return; }
+    const scope = this.scope;
+    const { watcher, release } = session.watch(getKind('pods')!, '');
+    const update = (): void => {
+      if (!this.current(scope)) { return; }
+      const state = watcher.state;
+      const counts = state.ready && !state.error && !state.namespace ? new Map<string, number>() : undefined;
+      if (counts) {
+        for (const pod of state.items) {
+          const node = pod.spec?.nodeName;
+          if (node && pod.status?.phase !== 'Succeeded' && pod.status?.phase !== 'Failed') {
+            counts.set(node, (counts.get(node) ?? 0) + 1);
+          }
+        }
+      }
+      this.tableContext.podsPerNode = counts;
+      this.publishCells(['pods']);
+    };
+    const unsubscribe = watcher.onChange(update);
+    this.nodePods = { release: () => { unsubscribe(); release(); } };
+    update();
+  }
+
   private async load(): Promise<void> {
     try {
       const session = this.services.clusters.session(this.context);
-      await session.connect();
-      const kind = await session.kind(this.kindId);
+      // Built-in kinds require no discovery and no /version round-trip.
+      const kind = getKind(this.kindId) ?? await session.kind(this.kindId);
+      if (this.tableDisposed) { return; }
       const namespace = this.services.clusters.namespaceFilter(this.context);
+      const key = `${kind.id}|${namespace}`;
+      if (this.scopeKey !== key || this.session !== session) {
+        this.watch?.release();
+        this.watch = undefined;
+        this.nodePods?.release();
+        this.nodePods = undefined;
+        this.scopeKey = key;
+        this.scope++;
+        this.session = session;
+        this.kind = kind;
+        this.namespace = namespace;
+        this.tableContext = {};
+        this.rawRows.clear();
+        this.rowCache = new WeakMap();
+        this.sent = new Map();
+        this.sentColumns = undefined;
+        this.permissions.clear();
+        this.painted = false;
+        this.firstRowsSent = false;
+        this.metricsAt = 0;
+        this.loadStarted = Date.now();
+        if (!kind.custom) {
+          const { watcher, release } = session.watch(kind, namespace);
+          const unsubscribe = watcher.onChange(() => this.scheduleRender());
+          this.watch = { watcher, release: () => { unsubscribe(); release(); } };
+        }
+      }
+      const scope = this.scope;
       if (kind.custom) {
         const table = buildServerTable(kind.id, kind.namespaced, await session.listTable(kind, namespace));
-        table.rows = await filterRowActions(session, kind, table.rows);
-        this.post('data', { ...table, namespace });
-        return;
+        if (this.current(scope)) { this.publish(table); }
+      } else {
+        this.scheduleRender();
       }
-      const key = `${kind.id}|${namespace}`;
-      if (this.watch?.key !== key) {
-        this.watch?.release();
-        const { watcher, release } = session.watch(kind, namespace);
-        const unsubscribe = watcher.onChange(() => void this.render());
-        this.watch = {
-          key,
-          watcher,
-          release: () => {
-            unsubscribe();
-            release();
-          }
-        };
-      }
-      await this.refreshMetrics(session, kind, namespace);
-      await this.watch.watcher.whenReady();
-      await this.render();
+      this.enrich();
     } catch (err) {
       this.post('error', { message: errorMessage(err) });
     }
   }
 
-  private async refreshMetrics(session: ClusterSession, kind: ResourceKind, namespace: string): Promise<void> {
-    const ctx: TableContext = {};
-    if (kind.id === 'pods') {
-      ctx.podMetrics = await session.podMetrics(namespace || undefined);
-    } else if (kind.id === 'nodes') {
-      const [metrics, pods] = await Promise.all([
-        session.nodeMetrics(),
-        session.list(getKind('pods')!, '', { fieldSelector: 'status.phase!=Succeeded,status.phase!=Failed' }).catch(() => undefined)
-      ]);
-      ctx.nodeMetrics = metrics;
-      if (pods) {
-        ctx.podsPerNode = new Map();
-        for (const pod of pods.items) {
-          const node = pod.spec?.nodeName;
-          if (node) {
-            ctx.podsPerNode.set(node, (ctx.podsPerNode.get(node) ?? 0) + 1);
-          }
-        }
-      }
-    }
-    this.tableContext = ctx;
+  private async refreshMetrics(session: ClusterSession, kind: ResourceKind, namespace: string, scope: number): Promise<void> {
+    const ctx: TableContext = kind.id === 'pods'
+      ? { podMetrics: await session.podMetrics(namespace || undefined) }
+      : { nodeMetrics: await session.nodeMetrics() };
+    if (!this.current(scope)) { return; }
+    this.metricsAt = Date.now();
+    this.tableContext = { ...this.tableContext, ...ctx };
+    this.publishCells(['cpu', 'memory'], session.metricsStatus ?? '');
   }
 
-  /** Rebuild the table from the watched objects. */
-  private async render(): Promise<void> {
-    if (!this.watch) {
-      return;
+  private publishCells(columns: string[], metricsNotice?: string): void {
+    if (!this.kind || !this.watch) { return; }
+    const items = this.watch.watcher.state.items;
+    const rows: TableRowUpdate[] = [];
+    // Send only cells that differ, and keep cached rows equal to what the webview shows.
+    for (const update of buildTableSupplement(this.kind, items, this.tableContext, columns)) {
+      const row = this.rawRows.get(update.key);
+      const cells: Record<string, Cell> = {};
+      for (const [column, cell] of Object.entries(update.cells ?? {})) {
+        const index = this.columnIndex.get(column);
+        if (row && index !== undefined && JSON.stringify(row.cells[index]) !== JSON.stringify(cell)) {
+          row.cells[index] = cell;
+          cells[column] = cell;
+        }
+      }
+      if (Object.keys(cells).length) { rows.push({ key: update.key, cells }); }
     }
-    const session = this.services.clusters.session(this.context);
-    const kind = await session.kind(this.kindId);
+    if (rows.length || metricsNotice !== undefined) {
+      this.supplement({ rows, metricsNotice });
+    }
+  }
+
+  /** A few namespaces at a time: a large list must not launch thousands of RBAC requests at once. */
+  private async refreshActions(): Promise<void> {
+    if (this.permissionsRunning || !this.session || !this.kind) { return; }
+    this.permissionsRunning = true;
+    const scope = this.scope;
+    const session = this.session;
+    const kind = this.kind;
+    try {
+      while (this.current(scope)) {
+        const candidates = new Map<string, Set<ActionId>>();
+        for (const row of this.rawRows.values()) {
+          const ns = row.namespace ?? '';
+          const actions = candidates.get(ns) ?? new Set<ActionId>();
+          row.actions.forEach((action) => actions.add(action));
+          candidates.set(ns, actions);
+        }
+        const stale = [...candidates].filter(([ns, actions]) => {
+          const cached = this.permissions.get(ns);
+          return !cached || Date.now() - cached.at >= 60_000 || [...actions].some((action) => !cached.checked.has(action));
+        }).slice(0, PERMISSION_BATCH);
+        if (!stale.length) { break; }
+        const results = await Promise.all(stale.map(async ([namespace, actions]) =>
+          ({ namespace, actions, allowed: await allowedActions(session, kind, namespace || undefined, [...actions]) })));
+        if (!this.current(scope)) { break; }
+        for (const { namespace, actions, allowed } of results) {
+          this.permissions.set(namespace, { checked: actions, allowed, at: Date.now() });
+        }
+        const done = new Map(results.map((result) => [result.namespace, result.allowed]));
+        this.supplement({ rows: [...this.rawRows.values()]
+          .filter((row) => done.has(row.namespace ?? ''))
+          .map((row) => ({ key: row.key, actions: row.actions.filter((action) => done.get(row.namespace ?? '')!.has(action)) })) });
+      }
+    } catch (err) {
+      logger.warn('Table action checks failed', errorMessage(err));
+    } finally {
+      this.permissionsRunning = false;
+      if (scope !== this.scope && this.painted && !this.tableDisposed) { void this.refreshActions(); }
+    }
+  }
+
+  /** Resource snapshots never await metrics, permission checks or namespace discovery. */
+  private render(): void {
+    if (!this.current(this.scope) || !this.watch || !this.kind) { return; }
     const state = this.watch.watcher.state;
+    if (!state.ready && !state.items.length) { return; }
     if (state.error && !state.items.length) {
       this.post('error', { message: state.error });
       return;
     }
-    if (kind.id === 'crds') {
+    if (this.kind.id === 'crds') {
       for (const crd of state.items) {
         registerCustomKind(crd as unknown as Parameters<typeof registerCustomKind>[0]);
       }
     }
-    const table = buildTable(kind, state.items, this.tableContext);
-    table.rows = await filterRowActions(session, kind, table.rows);
-    const notices = [
-      state.notice,
-      state.error ? `Live updates interrupted, reconnecting: ${state.error}` : undefined,
-      (kind.id === 'pods' || kind.id === 'nodes') && session.metricsStatus ? `Metrics: ${session.metricsStatus}` : undefined
-    ].filter(Boolean);
-    this.post('data', { ...table, namespace: this.services.clusters.namespaceFilter(this.context), notice: notices.join(' ') || undefined });
+    this.publish({
+      ...buildTable(this.kind, state.items, this.tableContext, this.rowCache),
+      loading: state.ready ? undefined : `Loading more resources… ${state.items.length} loaded`,
+      notice: [state.notice, state.error ? `Live updates interrupted, reconnecting: ${state.error}` : undefined].filter(Boolean).join(' ') || undefined
+    });
+  }
+
+  /** The first snapshot of a scope is sent whole; afterwards only added, changed and removed rows. */
+  private publish(table: TableData): void {
+    this.rawRows = new Map(table.rows.map((row) => [row.key, row]));
+    const columns = JSON.stringify(table.columns);
+    const full = this.sentColumns !== columns;
+    const previous = full ? new Map<string, { row: Row; json?: string }>() : this.sent;
+    const sent = new Map<string, { row: Row; json?: string }>();
+    const upsert: Row[] = [];
+    for (const row of table.rows) {
+      const before = previous.get(row.key);
+      if (before?.row === row) {
+        sent.set(row.key, before);
+        continue;
+      }
+      const json = before ? JSON.stringify(row) : undefined;
+      if (before && (before.json ??= JSON.stringify(before.row)) === json) {
+        sent.set(row.key, { row, json });
+        continue;
+      }
+      sent.set(row.key, { row, json });
+      upsert.push(row);
+    }
+    const remove = [...previous.keys()].filter((key) => !sent.has(key));
+    this.sent = sent;
+    this.sentColumns = columns;
+    this.columnIndex = new Map(table.columns.map((column, index) => [column.id, index]));
+    const visibleActions = (row: Row): Row => ({ ...row, actions: row.actions.filter((action) =>
+      this.permissions.get(row.namespace ?? '')?.allowed.has(action) || action === 'details' || action === 'yaml') });
+    if (full) {
+      this.post('data', { ...table, namespace: this.namespace, scope: this.scope, rows: table.rows.map(visibleActions) } satisfies ResourceTableData);
+    } else {
+      this.post('patch', {
+        scope: this.scope, namespace: this.namespace, upsert: upsert.map(visibleActions), remove,
+        notice: table.notice, loading: table.loading, metricsAvailable: table.metricsAvailable
+      } satisfies TablePatch);
+    }
+    if (!this.firstRowsSent) {
+      this.firstRowsSent = true;
+      logger.info('Resource table first rows', { kind: this.kindId, rows: table.rows.length, elapsedMs: Date.now() - this.loadStarted });
+    }
+    if (this.painted) { void this.refreshActions(); }
   }
 
   protected override onDispose(): void {
+    this.tableDisposed = true;
+    if (this.renderTimer) { clearTimeout(this.renderTimer); }
+    this.nodePods?.release();
     this.watch?.release();
     ResourceTablePanel.panels.delete(`${this.context}\u0000${this.kindId}`);
     super.onDispose();
@@ -518,6 +738,9 @@ export class DetailsPanel extends BaseWebviewPanel {
         obj = latest;
       } else {
         obj = await session.get(kind, ref.name, ref.namespace);
+      }
+      if (ref !== this.current) {
+        return;
       }
       this.currentObject = obj;
       const details = await buildDetails(session, kind, obj, this.metrics, { range: this.metricsRange });

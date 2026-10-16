@@ -2,6 +2,32 @@
 
 All notable changes to this extension are documented in this file.
 
+## 0.3.0 - 2026-10-16
+
+### Added
+
+- Resource table columns can be resized by dragging the header edge; double-click fits the widest value on the page. Widths are kept per resource kind.
+
+### Fixed
+
+- Keep a visible loading indicator while resource tabs open, refresh, or switch namespaces; clear it on errors and unchanged responses.
+- Start resource lists with a small 100-item page, then load the remaining resources in consistent 500-item server-side pages.
+- Show resource rows before action permission checks and metrics finish, and load the namespace selector independently.
+- Preserve early webview responses until the client is ready and immediately retry refreshes requested during an active load instead of waiting for the polling interval.
+- Bound resource tables to 100 visible rows with Previous/Next navigation; keep search, sorting and select-all across the full filtered list, coalesce incoming renders and preserve unchanged visible pages.
+- Publish live updates during continuous watch traffic instead of waiting indefinitely for a quiet period; stop pending watch work when a tab is closed.
+- Share a pod watch for node counts instead of repeatedly downloading all active pods, and keep slow metrics requests from delaying namespace changes.
+- Request API responses gzip-compressed, like kubectl: large lists load several times faster (all pods of a ~850-pod cluster in ~1.2 s instead of ~6 s).
+- Send only metric cells that changed.
+- Keep showing the last complete list while a watch re-lists after 410 Gone or a reconnect, instead of shrinking the table to its first page.
+- Running job durations tick live; completed ones use the same format as ages (e.g. `3h12m`).
+- Check row action permissions with one SelfSubjectRulesReview per namespace (a few namespaces at a time) instead of one SelfSubjectAccessReview per action; cluster-scoped checks and servers with incomplete rules still use access reviews (~850-pod cluster: 67 requests in ~1.8 s instead of 402 in ~7 s).
+- Send resource tables to the webview once, then only added, changed and removed rows; rows of unchanged objects are not rebuilt on the host and their DOM rows are reused.
+
+### Changed
+
+- Pod CPU and Memory columns use the same format as nodes: percentage with a usage bar and absolute values in the tooltip, relative to the pod limit (or request when no limit is set). Pods without requests or limits show absolute usage.
+
 ## 0.2.0 - 2026-10-16
 
 ### Added

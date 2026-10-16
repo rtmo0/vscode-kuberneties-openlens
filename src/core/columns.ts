@@ -1,8 +1,8 @@
 /* Table columns for every built-in kind (what `kubectl get -o wide` / Lens show). */
 import type { K8sObject, PodUsage, Usage } from './cluster';
-import { formatBytes, formatCpu, parseQuantity } from './format';
+import { formatAge, formatBytes, formatCpu, parseQuantity } from './format';
 import { decodeRelease, latestReleaseSecrets } from './helm';
-import type { ActionId, Cell, Column, Row, TableData, Tone } from './protocol';
+import type { ActionId, Cell, Column, Row, TableData, TableRowUpdate, Tone } from './protocol';
 import { findKindByKind, ResourceKind } from './resources';
 import { containerDots, nodeRoles, nodeStatus, ownerOf, podRestarts, podStatus, selectorString, workloadHealth } from './status';
 
@@ -80,30 +80,57 @@ function linkToOwner(o: K8sObject): Cell {
   };
 }
 
+/** Percentage with a bar and the absolute numbers in the tooltip, shared by nodes and pods. */
+function ratioCell(used: number, total: number, of: string, key: 'cpu' | 'memory', sort: number): Cell {
+  const ratio = used / total;
+  const fmt = key === 'cpu' ? formatCpu : formatBytes;
+  return {
+    text: `${Math.round(ratio * 100)}%`,
+    sort,
+    ratio,
+    title: `${fmt(used)} of ${fmt(total)} ${of}`,
+    tone: ratio > 0.9 ? 'error' : ratio > 0.75 ? 'warn' : 'ok'
+  };
+}
+
+/** Pod total of a resource, only when every container sets it (otherwise the pod is unbounded). */
+function podResource(o: K8sObject, field: 'limits' | 'requests', key: 'cpu' | 'memory'): number {
+  const podLevel = parseQuantity(o.spec?.resources?.[field]?.[key]);
+  if (podLevel) {
+    return podLevel;
+  }
+  const containers: any[] = o.spec?.containers ?? [];
+  if (!containers.length || containers.some((c) => !c.resources?.[field]?.[key])) {
+    return 0;
+  }
+  return containers.reduce((sum, c) => sum + parseQuantity(c.resources[field][key]), 0);
+}
+
+/** Pod usage as a share of its limit (or request), sorted by absolute usage across pods. */
+function podUsageCell(o: K8sObject, used: number | undefined, key: 'cpu' | 'memory'): Cell {
+  if (used === undefined) {
+    return text('');
+  }
+  const limit = podResource(o, 'limits', key);
+  if (limit) {
+    return ratioCell(used, limit, 'limit', key, used);
+  }
+  const request = podResource(o, 'requests', key);
+  if (request) {
+    return ratioCell(used, request, 'requested', key, used);
+  }
+  const fmt = key === 'cpu' ? formatCpu : formatBytes;
+  return { ...num(used, fmt(used)), title: `${fmt(used)}, no requests or limits set` };
+}
+
 function podColumns(ctx: TableContext): ColumnSpec[] {
   const usage = (o: K8sObject): PodUsage | undefined => ctx.podMetrics?.get(`${o.metadata.namespace}/${o.metadata.name}`);
   return [
     NAME,
     NAMESPACE,
     { id: 'containers', title: 'Containers', cell: (o) => ({ text: '', dots: containerDots(o), sort: (o.spec?.containers ?? []).length }) },
-    {
-      id: 'cpu',
-      title: 'CPU',
-      align: 'right',
-      cell: (o) => {
-        const u = usage(o);
-        return u ? num(u.cpu, formatCpu(u.cpu)) : text('');
-      }
-    },
-    {
-      id: 'memory',
-      title: 'Memory',
-      align: 'right',
-      cell: (o) => {
-        const u = usage(o);
-        return u ? num(u.memory, formatBytes(u.memory)) : text('');
-      }
-    },
+    { id: 'cpu', title: 'CPU', align: 'right', cell: (o) => podUsageCell(o, usage(o)?.cpu, 'cpu') },
+    { id: 'memory', title: 'Memory', align: 'right', cell: (o) => podUsageCell(o, usage(o)?.memory, 'memory') },
     {
       id: 'restarts',
       title: 'Restarts',
@@ -139,15 +166,7 @@ function nodeColumns(ctx: TableContext): ColumnSpec[] {
     if (used === undefined || !allocatable) {
       return text('');
     }
-    const ratio = used / allocatable;
-    const fmt = key === 'cpu' ? formatCpu : formatBytes;
-    return {
-      text: `${Math.round(ratio * 100)}%`,
-      sort: ratio,
-      ratio,
-      title: `${fmt(used)} of ${fmt(allocatable)} allocatable`,
-      tone: ratio > 0.9 ? 'error' : ratio > 0.75 ? 'warn' : 'ok'
-    };
+    return ratioCell(used, allocatable, 'allocatable', key, used / allocatable);
   };
   return [
     NAME,
@@ -158,7 +177,7 @@ function nodeColumns(ctx: TableContext): ColumnSpec[] {
       title: 'Pods',
       align: 'right',
       cell: (o) => {
-        const count = ctx.podsPerNode?.get(o.metadata.name);
+        const count = ctx.podsPerNode ? ctx.podsPerNode.get(o.metadata.name) ?? 0 : undefined;
         const capacity = parseQuantity(o.status?.allocatable?.pods);
         return count === undefined ? text(capacity || '') : num(count, `${count}/${capacity}`);
       }
@@ -284,9 +303,12 @@ const COLUMNS: Record<string, (ctx: TableContext) => ColumnSpec[]> = {
         if (!start) {
           return text('');
         }
-        const end = Date.parse(o.status?.completionTime ?? '') || Date.now();
-        const seconds = Math.round((end - start) / 1000);
-        return num(seconds, seconds < 120 ? `${seconds}s` : `${Math.round(seconds / 60)}m`);
+        const end = Date.parse(o.status?.completionTime ?? '');
+        if (!end) {
+          // Still running: the webview ticks it like an age; earlier starts sort as longer.
+          return { text: '', time: o.status.startTime, sort: (Date.now() - start) / 1000 };
+        }
+        return num(Math.round((end - start) / 1000), formatAge(start, end));
       }
     },
     { id: 'owner', title: 'Controlled By', cell: linkToOwner },
@@ -611,20 +633,40 @@ export function rowActions(kindId: string, obj?: K8sObject): ActionId[] {
   }
 }
 
-/** Build the table for a built-in kind. */
-export function buildTable(kind: ResourceKind, items: K8sObject[], ctx: TableContext): TableData {
+/** Compute just the background columns, without rebuilding resource/status/action cells. */
+export function buildTableSupplement(kind: ResourceKind, items: K8sObject[], ctx: TableContext, columns: string[]): TableRowUpdate[] {
+  const specs = (kind.id === 'pods' ? podColumns(ctx) : kind.id === 'nodes' ? nodeColumns(ctx) : [])
+    .filter((column) => columns.includes(column.id));
+  return items.map((obj) => ({
+    key: obj.metadata.uid ?? `${obj.metadata.namespace}/${obj.metadata.name}`,
+    cells: Object.fromEntries(specs.map((column) => [column.id, column.cell(obj)]))
+  }));
+}
+
+/**
+ * Build the table for a built-in kind. With `cache`, rows of objects that the
+ * watch did not replace are reused as-is, so only changed objects are rebuilt.
+ */
+export function buildTable(kind: ResourceKind, items: K8sObject[], ctx: TableContext, cache?: WeakMap<K8sObject, Row>): TableData {
   if (kind.id === 'helmreleases') {
     return helmTable(items);
   }
   const specs = (COLUMNS[kind.id] ?? (() => (kind.namespaced ? [NAME, NAMESPACE, AGE] : [NAME, AGE])))(ctx);
-  const rows: Row[] = items.map((obj) => ({
-    key: obj.metadata.uid ?? `${obj.metadata.namespace}/${obj.metadata.name}`,
-    name: obj.metadata.name,
-    namespace: obj.metadata.namespace,
-    cells: specs.map((spec) => spec.cell(obj)),
-    actions: rowActions(kind.id, obj),
-    search: selectorString(obj.metadata.labels)
-  }));
+  const rows: Row[] = items.map((obj) => {
+    let row = cache?.get(obj);
+    if (!row) {
+      row = {
+        key: obj.metadata.uid ?? `${obj.metadata.namespace}/${obj.metadata.name}`,
+        name: obj.metadata.name,
+        namespace: obj.metadata.namespace,
+        cells: specs.map((spec) => spec.cell(obj)),
+        actions: rowActions(kind.id, obj),
+        search: selectorString(obj.metadata.labels)
+      };
+      cache?.set(obj, row);
+    }
+    return row;
+  });
   return {
     columns: specs.map(({ cell: _cell, ...column }) => column),
     rows,

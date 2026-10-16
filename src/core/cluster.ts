@@ -6,6 +6,7 @@ import { ContextHealth, staticHealth } from './kubeconfigHealth';
 import { findByName, stableStringify } from './kubeconfigModel';
 import { errorMessage, isForbidden, isNotFound, KubeApiError, KubeRest } from './kubeRest';
 import { logger } from './logger';
+import { ResourceRule, rulesAllow } from './permissions';
 import { parseQuantity } from './format';
 import { ResourceWatcher } from './watch';
 import {
@@ -116,6 +117,7 @@ export class ClusterSession {
     this.metricsUnavailableUntil = 0;
     this.discovery.clear();
     this.accessCache.clear();
+    this.rulesCache.clear();
     return this.connect();
   }
 
@@ -161,6 +163,7 @@ export class ClusterSession {
   // ─────────────────────────── RBAC ───────────────────────────
 
   private readonly accessCache = new Map<string, { at: number; allowed: Promise<boolean> }>();
+  private readonly rulesCache = new Map<string, { at: number; rules: Promise<ResourceRule[] | undefined> }>();
 
   /**
    * SelfSubjectAccessReview: may the current user do `verb` on the resource?
@@ -172,18 +175,40 @@ export class ClusterSession {
     if (cached && Date.now() - cached.at < ACCESS_CACHE_MS) {
       return cached.allowed;
     }
-    const allowed = this.rest
-      .json<{ status?: { allowed?: boolean } }>('POST', '/apis/authorization.k8s.io/v1/selfsubjectaccessreviews', {
-        body: {
-          apiVersion: 'authorization.k8s.io/v1',
-          kind: 'SelfSubjectAccessReview',
-          spec: { resourceAttributes: { verb, group, resource, subresource, namespace: namespace || undefined } }
-        }
-      })
-      .then((review) => review?.status?.allowed !== false)
-      .catch(() => true);
+    // Namespaced checks are answered from one rules review per namespace; cluster-scoped
+    // ones, and namespaces whose rules are incomplete, still ask the server one by one.
+    const allowed = (namespace ? this.rules(namespace) : Promise.resolve(undefined)).then((rules) =>
+      rules
+        ? rulesAllow(rules, verb, group, resource, subresource)
+        : this.rest
+            .json<{ status?: { allowed?: boolean } }>('POST', '/apis/authorization.k8s.io/v1/selfsubjectaccessreviews', {
+              body: {
+                apiVersion: 'authorization.k8s.io/v1',
+                kind: 'SelfSubjectAccessReview',
+                spec: { resourceAttributes: { verb, group, resource, subresource, namespace: namespace || undefined } }
+              }
+            })
+            .then((review) => review?.status?.allowed !== false)
+            .catch(() => true)
+    );
     this.accessCache.set(key, { at: Date.now(), allowed });
     return allowed;
+  }
+
+  /** The user's resource rules in a namespace, or undefined when the server cannot list them completely. */
+  private rules(namespace: string): Promise<ResourceRule[] | undefined> {
+    const cached = this.rulesCache.get(namespace);
+    if (cached && Date.now() - cached.at < ACCESS_CACHE_MS) {
+      return cached.rules;
+    }
+    const rules = this.rest
+      .json<{ status?: { resourceRules?: ResourceRule[]; incomplete?: boolean } }>('POST', '/apis/authorization.k8s.io/v1/selfsubjectrulesreviews', {
+        body: { apiVersion: 'authorization.k8s.io/v1', kind: 'SelfSubjectRulesReview', spec: { namespace } }
+      })
+      .then((review) => (review?.status && !review.status.incomplete ? review.status.resourceRules ?? [] : undefined))
+      .catch(() => undefined);
+    this.rulesCache.set(namespace, { at: Date.now(), rules });
+    return rules;
   }
 
   // ─────────────────────────── namespaces ───────────────────────────

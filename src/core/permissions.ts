@@ -50,6 +50,25 @@ function checksFor(action: ActionId, kind: ResourceKind): Check[] {
   }
 }
 
+export interface ResourceRule {
+  verbs?: string[];
+  apiGroups?: string[];
+  resources?: string[];
+  resourceNames?: string[];
+}
+
+/** RBAC rule matching, as the API server does it for a request without an object name. */
+export function rulesAllow(rules: ResourceRule[], verb: string, group: string, resource: string, subresource?: string): boolean {
+  const combined = subresource ? `${resource}/${subresource}` : resource;
+  return rules.some((rule) =>
+    // Rules limited to named objects do not grant the action in general.
+    !rule.resourceNames?.length &&
+    (rule.verbs ?? []).some((v) => v === '*' || v === verb) &&
+    (rule.apiGroups ?? []).some((g) => g === '*' || g === group) &&
+    (rule.resources ?? []).some((r) => r === '*' || r === combined || (!!subresource && r === `*/${subresource}`))
+  );
+}
+
 /** Actions from `actions` that the user may run in `namespace`. */
 export async function allowedActions(session: ClusterSession, kind: ResourceKind, namespace: string | undefined, actions: ActionId[]): Promise<Set<ActionId>> {
   if (!getConfig().checkPermissions) {
