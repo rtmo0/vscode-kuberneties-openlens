@@ -1,5 +1,7 @@
 # Kubernetes Explorer & OpenLens Tools
 
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/rtmo0)
+
 An independent, OpenLens-style Kubernetes IDE for VS Code: a cluster overview, every workload and resource in sortable tables, pods with live CPU and memory metrics, logs, shells, port forwarding, secrets, Helm releases, YAML editing, and safe import of kubeconfigs you receive as a file or as text.
 
 No `kubectl` is needed: the extension talks to the API server directly with the credentials from your kubeconfig (certificates, tokens, exec plugins such as `aws`, `gke-gcloud-auth-plugin` or `yc`, and proxies).
@@ -137,6 +139,10 @@ OPENLENS_TEST_CONTEXT=kind-kind npm run test:integration   # against a cluster w
 CI runs the integration tests on a kind cluster with metrics-server, Helm and a minimal Prometheus.
 
 Press <kbd>F5</kbd> to launch the Extension Development Host.
+
+## Support
+
+Kubernetes Explorer & OpenLens Tools is free and open source. If it saves you time, you can support its development on [Buy Me a Coffee](https://buymeacoffee.com/rtmo0). Bug reports and pull requests are just as welcome.
 
 ## License
 
