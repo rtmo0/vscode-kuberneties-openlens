@@ -1224,5 +1224,8 @@
     "esbuild": "^0.28.2",
     "typescript": "^5.9.3"
   },
+  "overrides": {
+    "@azure/msal-node": "^7.1.2"
+  },
   "icon": "resources/icon.png"
 }
