@@ -2,6 +2,12 @@
 
 All notable changes to this extension are documented in this file.
 
+## 1.3.2 - 2026-10-28
+
+### Added
+
+- **Connect** and **Disconnect** buttons on cluster rows in the tree (also in the context menu and Command Palette). Disconnect closes the cluster's panels, stops its port forwards and watches, and keeps it offline until you connect again.
+
 ## 1.3.1 - 2026-10-16
 
 ### Changed

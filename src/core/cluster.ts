@@ -474,6 +474,8 @@ export interface ContextInfo {
 export class ClusterManager implements vscode.Disposable {
   private state: KubeconfigState;
   private readonly sessions = new Map<string, { session: ClusterSession; fingerprint: string }>();
+  /** Contexts the user disconnected; the tree does not reconnect them on its own. */
+  private readonly disconnected = new Set<string>();
   private readonly changeEmitter = new vscode.EventEmitter<void>();
   private readonly statusEmitter = new vscode.EventEmitter<string>();
 
@@ -538,6 +540,7 @@ export class ClusterManager implements vscode.Disposable {
       throw new Error(`Context "${context}" is not in the kubeconfig.`);
     }
     const kc = buildKubeConfig(this.state, context);
+    this.disconnected.delete(context);
     const session = new ClusterSession(context, kc, ctx.context.namespace, () => this.statusEmitter.fire(context));
     this.sessions.set(context, { session, fingerprint: this.fingerprint(context) });
     return session;
@@ -545,6 +548,22 @@ export class ClusterManager implements vscode.Disposable {
 
   peekSession(context: string): ClusterSession | undefined {
     return this.sessions.get(context)?.session;
+  }
+
+  /** Drop the session of a context; the next `session` call starts a new one. */
+  disconnect(context: string): void {
+    const entry = this.sessions.get(context);
+    if (entry) {
+      entry.session.dispose();
+      this.sessions.delete(context);
+      logger.info(`Disconnected from ${context}`);
+    }
+    this.disconnected.add(context);
+    this.statusEmitter.fire(context);
+  }
+
+  isDisconnected(context: string): boolean {
+    return this.disconnected.has(context);
   }
 
   /** Re-read the kubeconfig files; sessions whose context changed are dropped. */

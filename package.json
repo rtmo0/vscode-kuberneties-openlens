@@ -2,7 +2,7 @@
   "name": "vscode-kuberneties-openlens",
   "displayName": "Kubernetes Explorer & OpenLens Tools",
   "description": "OpenLens-style Kubernetes IDE in VS Code: cluster overview, workloads, pods with live CPU/memory metrics, logs, shells, secrets, port forwarding, Helm releases, YAML editing and safe kubeconfig import.",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "publisher": "samarin-aa-aka-rtm00",
   "license": "SEE LICENSE IN LICENSE",
   "pricing": "Free",
@@ -164,6 +164,18 @@
         "title": "Refresh",
         "category": "Kubernetes",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "openLens.connect",
+        "title": "Connect",
+        "category": "Kubernetes",
+        "icon": "$(plug)"
+      },
+      {
+        "command": "openLens.disconnect",
+        "title": "Disconnect",
+        "category": "Kubernetes",
+        "icon": "$(debug-disconnect)"
       },
       {
         "command": "openLens.reconnect",
@@ -533,6 +545,16 @@
       ],
       "view/item/context": [
         {
+          "command": "openLens.connect",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\.(idle|error|disconnected)/",
+          "group": "inline@0"
+        },
+        {
+          "command": "openLens.disconnect",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\.(connecting|connected)/",
+          "group": "inline@0"
+        },
+        {
           "command": "openLens.openDashboard",
           "when": "view == openLens.clusters && viewItem =~ /^context\\./",
           "group": "inline@1"
@@ -593,9 +615,19 @@
           "group": "2_context@5"
         },
         {
+          "command": "openLens.connect",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\.(idle|error|disconnected)/",
+          "group": "3_connection@1"
+        },
+        {
+          "command": "openLens.disconnect",
+          "when": "view == openLens.clusters && viewItem =~ /^context\\.(connecting|connected)/",
+          "group": "3_connection@2"
+        },
+        {
           "command": "openLens.reconnect",
           "when": "view == openLens.clusters && viewItem =~ /^context\\./",
-          "group": "3_connection@1"
+          "group": "3_connection@3"
         },
         {
           "command": "openLens.removeContext",

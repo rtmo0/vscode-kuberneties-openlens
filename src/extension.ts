@@ -22,6 +22,7 @@ import { registerLanguageModelTools } from './lm/tools';
 import { addCluster, connectCloudCluster, createLocalCluster, deleteLocalCluster, installK3s, WizardDeps } from './setup/clusterWizards';
 import { HELM_INSTALL_CONTEXT, installChart, installFromEditor, manageRepositories, pendingInstalls } from './setup/helmInstall';
 import { convertCompose, newDataFromFiles, newRegistrySecret, newTlsSecret, onboardTeam, serviceAccountAccess, WorkloadWizardDeps } from './setup/workloadWizards';
+import { BaseWebviewPanel } from './webviews/baseWebview';
 import { AddonsPanel, DeployPanel, DoctorPanel } from './webviews/setupPanels';
 import { ManifestSchemas } from './yaml/schemas';
 import { DashboardPanel, DetailsPanel, LogsPanel, PanelServices, ResourceTablePanel, TopologyPanel } from './webviews/panels';
@@ -113,6 +114,24 @@ export function activate(context: vscode.ExtensionContext): void {
 
   command('openLens.refreshClusters', () => clusters.reload());
   command('openLens.showLogs', () => logger.show());
+  command('openLens.connect', async (arg?: ContextArg) => {
+    const name = await pickContext(arg, 'Connect to a cluster');
+    if (name) {
+      await clusters.session(name).reconnect();
+    }
+  });
+  command('openLens.disconnect', async (arg?: ContextArg) => {
+    const name = await pickContext(arg, 'Disconnect from a cluster');
+    if (name) {
+      const session = clusters.peekSession(name);
+      if (session) {
+        forgetPrometheus(session);
+      }
+      BaseWebviewPanel.closeForContext(name);
+      forwards.stopAll(name);
+      clusters.disconnect(name);
+    }
+  });
   command('openLens.reconnect', async (arg?: ContextArg) => {
     const name = await pickContext(arg, 'Reconnect to a cluster');
     if (name) {

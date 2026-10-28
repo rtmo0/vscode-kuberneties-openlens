@@ -17,7 +17,7 @@ export class ContextNode extends vscode.TreeItem {
   ) {
     super(info.name, vscode.TreeItemCollapsibleState.Collapsed);
     const session = clusters.peekSession(info.name);
-    const status = session?.status ?? 'idle';
+    const status = clusters.isDisconnected(info.name) ? 'disconnected' : session?.status ?? 'idle';
     const namespace = clusters.namespaceFilter(info.name);
     this.id = `ctx:${info.name}`;
     const health = info.health;
@@ -53,6 +53,7 @@ export class ContextNode extends vscode.TreeItem {
     );
     const icons: Record<string, vscode.ThemeIcon> = {
       idle: new vscode.ThemeIcon('vm-outline'),
+      disconnected: new vscode.ThemeIcon('debug-disconnect', new vscode.ThemeColor('disabledForeground')),
       connecting: new vscode.ThemeIcon('loading~spin'),
       connected: new vscode.ThemeIcon('vm-active', new vscode.ThemeColor('testing.iconPassed')),
       error: new vscode.ThemeIcon('vm-outline', new vscode.ThemeColor('errorForeground'))
@@ -207,6 +208,9 @@ export class ClusterExplorerProvider implements vscode.TreeDataProvider<Node>, v
   }
 
   private async contextChildren(node: ContextNode): Promise<Node[]> {
+    if (this.clusters.isDisconnected(node.contextName)) {
+      return [new MessageNode('Disconnected — click to connect', 'plug', { command: 'openLens.connect', title: 'Connect', arguments: [{ contextName: node.contextName }] })];
+    }
     const session = this.clusters.session(node.contextName);
     try {
       await session.connect();

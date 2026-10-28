@@ -38,6 +38,15 @@ export abstract class BaseWebviewPanel implements vscode.Disposable {
 
   protected constructor(protected readonly extensionUri: vscode.Uri) {}
 
+  /** Close every open panel that shows the given context. */
+  static closeForContext(context: string): void {
+    for (const panel of [...BaseWebviewPanel.openPanels.values()]) {
+      if (panel.contextName === context) {
+        panel.dispose();
+      }
+    }
+  }
+
   /**
    * Creates (or reveals) the webview panel.
    *

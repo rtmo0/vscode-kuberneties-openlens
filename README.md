@@ -41,6 +41,7 @@ No `kubectl` is needed: the extension talks to the API server directly with the 
   - exec plugins, proxies and every other field are kept as they are.
 - The file is validated before it is written, written atomically, keeps its permissions (0600 for new files) and symlink, and the previous version is kept as a timestamped backup (last 5).
 - Switch, rename and remove contexts (unused clusters and users are cleaned up), and set a context's default namespace.
+- **Connect** / **Disconnect** a cluster from its row in the tree; disconnecting closes its panels and port forwards.
 
 ### Production safety
 - Mark contexts as **protected** (`openLens.protectedContexts`, names or patterns like `*prod*`, or **Toggle Protected Context** in the tree): every change to them needs the context name typed to confirm, and their panels and status bar item turn red.
