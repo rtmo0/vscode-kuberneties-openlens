@@ -2,6 +2,16 @@
 
 All notable changes to this extension are documented in this file.
 
+## 1.3.3 - 2026-10-30
+
+### Changed
+
+- Pod and node tables show the CPU and memory in use next to the percentage (for example `400m (80%)`, `256Mi (25%)`); the tooltip still shows the limit, request or allocatable total.
+
+### Fixed
+
+- A metrics request that times out or hits a network error no longer hides CPU and memory for a minute: metrics are retried after 10 s. A missing metrics-server or missing permissions still pause requests for 60 s.
+
 ## 1.3.2 - 2026-10-28
 
 ### Added

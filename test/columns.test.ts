@@ -7,7 +7,7 @@ import type { Cell, TableData } from '../src/core/protocol';
 
 const cell = (table: TableData, row: number, column: string): Cell => table.rows[row].cells[table.columns.findIndex((c) => c.id === column)];
 
-test('pod CPU and memory use the node format: share of limit, then request, with absolute values in the tooltip', () => {
+test('pod CPU and memory use the node format: used amount and share of limit, then request, with the total in the tooltip', () => {
   const pod = (name: string, resources: unknown): K8sObject => ({
     metadata: { name, namespace: 'default' },
     spec: { containers: [{ name: 'app', resources }] }
@@ -21,12 +21,12 @@ test('pod CPU and memory use the node format: share of limit, then request, with
 
   assert.deepEqual(
     { text: cell(table, 0, 'cpu').text, ratio: cell(table, 0, 'cpu').ratio, tone: cell(table, 0, 'cpu').tone, title: cell(table, 0, 'cpu').title },
-    { text: '80%', ratio: 0.8, tone: 'warn', title: '400m of 500m limit' }
+    { text: '400m (80%)', ratio: 0.8, tone: 'warn', title: '400m of 500m limit' }
   );
-  assert.equal(cell(table, 0, 'memory').text, '25%');
-  assert.equal(cell(table, 1, 'cpu').text, '40%');
+  assert.equal(cell(table, 0, 'memory').text, '256Mi (25%)');
+  assert.equal(cell(table, 1, 'cpu').text, '400m (40%)');
   assert.match(cell(table, 1, 'cpu').title ?? '', /of 1 requested/);
-  assert.equal(cell(table, 1, 'memory').text, '50%');
+  assert.equal(cell(table, 1, 'memory').text, '256Mi (50%)');
   assert.equal(cell(table, 2, 'cpu').ratio, undefined);
   assert.equal(cell(table, 2, 'cpu').text, '400m');
   // Pods sort by actual usage, whatever their limits are.
@@ -34,7 +34,7 @@ test('pod CPU and memory use the node format: share of limit, then request, with
 
   const node = buildTable(getKind('nodes')!, [{ metadata: { name: 'n' }, status: { allocatable: { cpu: '4', memory: '1Gi' } } }],
     { nodeMetrics: new Map([['n', { cpu: 1, memory: 256 * 1024 ** 2 }]]) });
-  assert.equal(cell(node, 0, 'cpu').text, '25%');
+  assert.equal(cell(node, 0, 'cpu').text, '1 (25%)');
   assert.equal(cell(node, 0, 'cpu').ratio, 0.25);
   assert.match(cell(node, 0, 'cpu').title ?? '', /of 4 allocatable/);
 });

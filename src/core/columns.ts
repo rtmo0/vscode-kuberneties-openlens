@@ -80,12 +80,12 @@ function linkToOwner(o: K8sObject): Cell {
   };
 }
 
-/** Percentage with a bar and the absolute numbers in the tooltip, shared by nodes and pods. */
+/** Used amount and percentage with a bar, the total in the tooltip; shared by nodes and pods. */
 function ratioCell(used: number, total: number, of: string, key: 'cpu' | 'memory', sort: number): Cell {
   const ratio = used / total;
   const fmt = key === 'cpu' ? formatCpu : formatBytes;
   return {
-    text: `${Math.round(ratio * 100)}%`,
+    text: `${fmt(used)} (${Math.round(ratio * 100)}%)`,
     sort,
     ratio,
     title: `${fmt(used)} of ${fmt(total)} ${of}`,

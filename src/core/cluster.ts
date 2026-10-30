@@ -45,6 +45,8 @@ export interface PodUsage extends Usage {
 }
 
 const METRICS_RETRY_MS = 60_000;
+/** Timeouts and network errors are usually transient: retry soon instead of hiding metrics for a minute. */
+const METRICS_TRANSIENT_RETRY_MS = 10_000;
 const NAMESPACE_CACHE_MS = 30_000;
 const CONNECT_TIMEOUT_MS = 15_000;
 const ACCESS_CACHE_MS = 60_000;
@@ -436,7 +438,7 @@ export class ClusterSession {
           : isForbidden(err)
             ? 'No permission to read metrics.k8s.io.'
             : errorMessage(err);
-      this.metricsUnavailableUntil = Date.now() + METRICS_RETRY_MS;
+      this.metricsUnavailableUntil = Date.now() + (err instanceof KubeApiError ? METRICS_RETRY_MS : METRICS_TRANSIENT_RETRY_MS);
       return undefined;
     }
   }

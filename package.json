@@ -2,7 +2,7 @@
   "name": "vscode-kuberneties-openlens",
   "displayName": "Kubernetes Explorer & OpenLens Tools",
   "description": "OpenLens-style Kubernetes IDE in VS Code: cluster overview, workloads, pods with live CPU/memory metrics, logs, shells, secrets, port forwarding, Helm releases, YAML editing and safe kubeconfig import.",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "publisher": "samarin-aa-aka-rtm00",
   "license": "SEE LICENSE IN LICENSE",
   "pricing": "Free",
